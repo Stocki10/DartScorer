@@ -4,7 +4,7 @@ struct DartsGameView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
-    @State private var setupPlayerNames: [String] = []
+    @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupFinishRule: FinishRule = .doubleOut
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
@@ -93,11 +93,11 @@ struct DartsGameView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $isShowingNewGameSetup) {
             NewGameSetupView(
-                playerNames: $setupPlayerNames,
+                setupPlayers: $setupPlayers,
                 finishRule: $setupFinishRule,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
-                    game.newGame(playerNames: setupPlayerNames, finishRule: setupFinishRule)
+                    game.newGame(playerNames: setupPlayers.map(\.name), finishRule: setupFinishRule)
                     isShowingNewGameSetup = false
                 }
             )
@@ -197,7 +197,9 @@ struct DartsGameView: View {
     }
 
     private func presentNewGameSetup() {
-        setupPlayerNames = game.players.map(\.name)
+        setupPlayers = game.players.enumerated().map { index, player in
+            SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
+        }
         setupFinishRule = game.finishRule
         isShowingNewGameSetup = true
     }
@@ -211,7 +213,7 @@ struct DartsGameView: View {
 }
 
 private struct NewGameSetupView: View {
-    @Binding var playerNames: [String]
+    @Binding var setupPlayers: [SetupPlayer]
     @Binding var finishRule: FinishRule
 
     let onCancel: () -> Void
@@ -221,7 +223,7 @@ private struct NewGameSetupView: View {
         NavigationStack {
             Form {
                 Section("Game Settings") {
-                    Stepper("Players: \(playerNames.count)", value: playerCountBinding, in: 1...4)
+                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 1...4)
 
                     Picker("Finish Mode", selection: $finishRule) {
                         ForEach(FinishRule.allCases) { rule in
@@ -237,18 +239,17 @@ private struct NewGameSetupView: View {
                         .foregroundStyle(.secondary)
 
                     List {
-                        ForEach(playerNames.indices, id: \.self) { index in
+                        ForEach($setupPlayers) { $player in
                             HStack {
-                                Image(systemName: "line.3.horizontal")
-                                    .foregroundStyle(.secondary)
-                                TextField("Player \(index + 1)", text: $playerNames[index])
+                                TextField(player.defaultName, text: $player.name)
                                     .textInputAutocapitalization(.words)
                                     .disableAutocorrection(true)
                             }
                         }
                         .onMove(perform: movePlayers)
                     }
-                    .frame(minHeight: 50)
+                    .listStyle(.plain)
+                    .frame(minHeight: 250)
                     .environment(\.editMode, .constant(.active))
                 }
             }
@@ -263,30 +264,45 @@ private struct NewGameSetupView: View {
             }
         }
         .onAppear {
-            if playerNames.isEmpty {
-                playerNames = ["Player 1", "Player 2"]
+            if setupPlayers.isEmpty {
+                setupPlayers = [
+                    SetupPlayer(name: "Player 1", defaultName: "Player 1"),
+                    SetupPlayer(name: "Player 2", defaultName: "Player 2")
+                ]
             }
         }
     }
 
     private var playerCountBinding: Binding<Int> {
         Binding(
-            get: { playerNames.count },
+            get: { setupPlayers.count },
             set: { newValue in
                 let clamped = min(max(1, newValue), 4)
-                if clamped > playerNames.count {
-                    let start = playerNames.count + 1
+                if clamped > setupPlayers.count {
+                    let start = setupPlayers.count + 1
                     for index in start...clamped {
-                        playerNames.append("Player \(index)")
+                        setupPlayers.append(SetupPlayer(name: "Player \(index)", defaultName: "Player \(index)"))
                     }
-                } else if clamped < playerNames.count {
-                    playerNames = Array(playerNames.prefix(clamped))
+                } else if clamped < setupPlayers.count {
+                    setupPlayers = Array(setupPlayers.prefix(clamped))
                 }
             }
         )
     }
 
     private func movePlayers(from source: IndexSet, to destination: Int) {
-        playerNames.move(fromOffsets: source, toOffset: destination)
+        setupPlayers.move(fromOffsets: source, toOffset: destination)
+    }
+}
+
+private struct SetupPlayer: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var defaultName: String
+
+    init(id: UUID = UUID(), name: String, defaultName: String) {
+        self.id = id
+        self.name = name
+        self.defaultName = defaultName
     }
 }
