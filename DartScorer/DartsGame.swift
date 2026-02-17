@@ -53,6 +53,10 @@ final class DartsGame: ObservableObject {
         return "Best Finish: Not available"
     }
 
+    var hasBestPossibleFinish: Bool {
+        bestPossibleFinishLine != "Best Finish: Not available"
+    }
+
     func submitThrow(segment: DartSegment, multiplier: DartMultiplier) {
         guard winner == nil else { return }
         guard remainingDarts > 0 else { return }

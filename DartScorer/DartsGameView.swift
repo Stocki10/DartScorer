@@ -75,7 +75,13 @@ struct DartsGameView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text(game.bestPossibleFinishLine)
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                        .fontWeight(game.hasBestPossibleFinish ? .bold : .regular)
+                        .foregroundStyle(game.hasBestPossibleFinish ? Color.white : Color.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(game.hasBestPossibleFinish ? Color.accentColor : Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
 
                     if let statusMessage = game.statusMessage {
                         Text(statusMessage)
