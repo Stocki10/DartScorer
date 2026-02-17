@@ -121,6 +121,38 @@ struct DartScorerTests {
         #expect(game.players.allSatisfy { $0.score == 501 })
     }
 
+    @Test func newGameCanUse301() {
+        let game = DartsGame(playerCount: 2)
+
+        game.newGame(playerNames: ["A", "B"], finishRule: .doubleOut, startingScore: 301)
+
+        #expect(game.startingScore == 301)
+        #expect(game.players.allSatisfy { $0.score == 301 })
+    }
+
+    @Test func randomNewLegResetsScoresAndKeepsPlayers() {
+        let game = DartsGame(playerCount: 3)
+        let namesBefore = Set(game.players.map(\.name))
+        game.players[0].score = 250
+
+        game.restartLegRandomSequence()
+
+        #expect(Set(game.players.map(\.name)) == namesBefore)
+        #expect(game.players.allSatisfy { $0.score == 501 })
+        #expect(game.activePlayerIndex == 0)
+    }
+
+    @Test func legAverageUsesScoredPointsPerThreeDarts() {
+        let game = DartsGame(playerCount: 2)
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(20), multiplier: .single)
+
+        let average = game.legAverage(for: game.players[0])
+        #expect(average != nil)
+        #expect(abs((average ?? 0) - 60.0) < 0.001)
+    }
+
     @Test func bestPossibleFinishShowsCheckoutRoute() {
         let game = DartsGame(playerCount: 2)
         game.players[0].score = 40

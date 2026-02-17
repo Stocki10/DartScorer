@@ -6,6 +6,7 @@ struct DartsGameView: View {
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupFinishRule: FinishRule = .doubleOut
+    @State private var setupStartScore: StartScoreOption = .score501
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -33,8 +34,13 @@ struct DartsGameView: View {
                                     }
                                 }
                                 Spacer()
-                                Text("\(player.score)")
-                                    .fontWeight(.semibold)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("\(player.score)")
+                                        .fontWeight(.semibold)
+                                    Text("⌀ \(String(format: "%.1f", game.legAverage(for: player) ?? 0.0))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             .padding(10)
                             .background(index == game.activePlayerIndex ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground))
@@ -104,9 +110,14 @@ struct DartsGameView: View {
             NewGameSetupView(
                 setupPlayers: $setupPlayers,
                 finishRule: $setupFinishRule,
+                startScore: $setupStartScore,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
-                    game.newGame(playerNames: setupPlayers.map(\.name), finishRule: setupFinishRule)
+                    game.newGame(
+                        playerNames: setupPlayers.map(\.name),
+                        finishRule: setupFinishRule,
+                        startingScore: setupStartScore.rawValue
+                    )
                     isShowingNewGameSetup = false
                 }
             )
@@ -160,7 +171,7 @@ struct DartsGameView: View {
                     .disabled(game.winner != nil)
                 }
 
-                Button("Bull") {
+                Button(selectedMultiplier == .single ? "25" : "Bull") {
                     game.submitThrow(segment: .bull, multiplier: selectedMultiplier)
                 }
                 .buttonStyle(.borderedProminent)
@@ -186,8 +197,8 @@ struct DartsGameView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Button("Restart Leg") {
-                        game.restartLeg()
+                    Button("New Leg (Random)") {
+                        game.restartLegRandomSequence()
                     }
                     .buttonStyle(.borderedProminent)
 
@@ -210,6 +221,7 @@ struct DartsGameView: View {
             SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
         }
         setupFinishRule = game.finishRule
+        setupStartScore = StartScoreOption(rawValue: game.startingScore) ?? .score501
         isShowingNewGameSetup = true
     }
 
@@ -224,6 +236,7 @@ struct DartsGameView: View {
 private struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
     @Binding var finishRule: FinishRule
+    @Binding var startScore: StartScoreOption
 
     let onCancel: () -> Void
     let onStart: () -> Void
@@ -233,6 +246,13 @@ private struct NewGameSetupView: View {
             Form {
                 Section("Game Settings") {
                     Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 1...4)
+
+                    Picker("Game", selection: $startScore) {
+                        ForEach(StartScoreOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
 
                     Picker("Finish Mode", selection: $finishRule) {
                         ForEach(FinishRule.allCases) { rule in
