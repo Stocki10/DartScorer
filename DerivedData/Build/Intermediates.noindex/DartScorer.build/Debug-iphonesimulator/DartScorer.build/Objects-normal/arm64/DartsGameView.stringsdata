@@ -148,14 +148,6 @@
       },
       {
         "comment": "",
-        "key": "Leg Won",
-        "location": {
-          "startingColumn": 22,
-          "startingLine": 234
-        }
-      },
-      {
-        "comment": "",
         "key": "New Leg (Random)",
         "location": {
           "startingColumn": 32,
@@ -166,7 +158,15 @@
         "comment": "",
         "key": "New Game",
         "location": {
-          "startingColumn": 28,
+          "startingColumn": 52,
+          "startingLine": 251
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start New Game",
+        "location": {
+          "startingColumn": 65,
           "startingLine": 251
         }
       },
@@ -175,7 +175,7 @@
         "key": "New Game",
         "location": {
           "startingColumn": 30,
-          "startingLine": 360
+          "startingLine": 364
         }
       },
       {
@@ -183,7 +183,7 @@
         "key": "Game Settings",
         "location": {
           "startingColumn": 25,
-          "startingLine": 310
+          "startingLine": 314
         }
       },
       {
@@ -191,7 +191,7 @@
         "key": "Player Order",
         "location": {
           "startingColumn": 25,
-          "startingLine": 340
+          "startingLine": 344
         }
       },
       {
@@ -199,7 +199,7 @@
         "key": "Players: %lld",
         "location": {
           "startingColumn": 29,
-          "startingLine": 311
+          "startingLine": 315
         }
       },
       {
@@ -207,7 +207,7 @@
         "key": "Game",
         "location": {
           "startingColumn": 28,
-          "startingLine": 313
+          "startingLine": 317
         }
       },
       {
@@ -215,7 +215,7 @@
         "key": "Finish Mode",
         "location": {
           "startingColumn": 28,
-          "startingLine": 320
+          "startingLine": 324
         }
       },
       {
@@ -223,7 +223,7 @@
         "key": "In Mode",
         "location": {
           "startingColumn": 28,
-          "startingLine": 327
+          "startingLine": 331
         }
       },
       {
@@ -231,7 +231,7 @@
         "key": "Set Mode",
         "location": {
           "startingColumn": 28,
-          "startingLine": 334
+          "startingLine": 338
         }
       },
       {
@@ -239,7 +239,7 @@
         "key": "Legs to Win: %lld",
         "location": {
           "startingColumn": 33,
-          "startingLine": 336
+          "startingLine": 340
         }
       },
       {
@@ -247,7 +247,7 @@
         "key": "Drag rows to set the throw sequence.",
         "location": {
           "startingColumn": 26,
-          "startingLine": 341
+          "startingLine": 345
         }
       },
       {
@@ -255,7 +255,7 @@
         "key": "Cancel",
         "location": {
           "startingColumn": 28,
-          "startingLine": 363
+          "startingLine": 367
         }
       },
       {
@@ -263,7 +263,7 @@
         "key": "Start",
         "location": {
           "startingColumn": 28,
-          "startingLine": 366
+          "startingLine": 370
         }
       }
     ]

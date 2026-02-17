@@ -231,7 +231,7 @@ struct DartsGameView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 16) {
-                Text("Leg Won")
+                Text(winnerTitle)
                     .font(.title)
                     .fontWeight(.bold)
                 Text(winner.name)
@@ -248,7 +248,7 @@ struct DartsGameView: View {
                         .buttonStyle(.borderedProminent)
                     }
 
-                    Button("New Game") {
+                    Button(game.setWinner == nil ? "New Game" : "Start New Game") {
                         presentNewGameSetup()
                     }
                     .buttonStyle(.bordered)
@@ -260,11 +260,15 @@ struct DartsGameView: View {
 
     private var winningSubtitle: String {
         if game.setWinner != nil {
-            return "Set complete."
+            return "Match complete."
         }
         let outText = game.finishRule == .doubleOut ? "double-out" : "single-out"
         let inText = game.inRule == .doubleIn ? "double-in" : "default-in"
         return "Played \(inText), \(outText)."
+    }
+
+    private var winnerTitle: String {
+        game.setWinner == nil ? "Leg Won" : "Winner"
     }
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
