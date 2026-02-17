@@ -56,7 +56,11 @@ struct DartsGameView: View {
                     HStack(spacing: 8) {
                         if game.currentTurn.darts.isEmpty {
                             Text("No throws")
-                                .foregroundStyle(.secondary)
+                                .font(.subheadline)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                         } else {
                             ForEach(Array(game.currentTurn.darts.enumerated()), id: \.offset) { _, throwValue in
                                 Text(throwValue.displayText)
