@@ -2,10 +2,12 @@ import Foundation
 
 struct Turn: Equatable {
     let startingScore: Int
+    let openedAtTurnStart: Bool
     var darts: [DartThrow]
 
-    init(startingScore: Int, darts: [DartThrow] = []) {
+    init(startingScore: Int, openedAtTurnStart: Bool = true, darts: [DartThrow] = []) {
         self.startingScore = startingScore
+        self.openedAtTurnStart = openedAtTurnStart
         self.darts = darts
     }
 

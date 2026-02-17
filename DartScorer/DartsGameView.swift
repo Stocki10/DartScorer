@@ -6,8 +6,12 @@ struct DartsGameView: View {
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupFinishRule: FinishRule = .doubleOut
+    @State private var setupInRule: InRule = .default
     @State private var setupStartScore: StartScoreOption = .score501
+    @State private var setupSetModeEnabled = false
+    @State private var setupLegsToWin = 3
     @State private var isShowingRestartAlert = false
+    @State private var hasPresentedInitialSetup = false
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -21,6 +25,16 @@ struct DartsGameView: View {
                         ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
                             HStack {
                                 Text(player.name)
+                                if game.setModeEnabled {
+                                    Text("\(game.legsWon(for: player))")
+                                        .font(.footnote)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.accentColor)
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                }
                                 let throwsForBadge = throwsToDisplay(for: player, at: index)
                                 if !throwsForBadge.isEmpty {
                                     HStack(spacing: 4) {
@@ -111,17 +125,28 @@ struct DartsGameView: View {
             NewGameSetupView(
                 setupPlayers: $setupPlayers,
                 finishRule: $setupFinishRule,
+                inRule: $setupInRule,
                 startScore: $setupStartScore,
+                setModeEnabled: $setupSetModeEnabled,
+                legsToWin: $setupLegsToWin,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
                     game.newGame(
                         playerNames: setupPlayers.map(\.name),
                         finishRule: setupFinishRule,
-                        startingScore: setupStartScore.rawValue
+                        inRule: setupInRule,
+                        startingScore: setupStartScore.rawValue,
+                        setModeEnabled: setupSetModeEnabled,
+                        legsToWin: setupLegsToWin
                     )
                     isShowingNewGameSetup = false
                 }
             )
+        }
+        .onAppear {
+            guard !hasPresentedInitialSetup else { return }
+            hasPresentedInitialSetup = true
+            presentNewGameSetup()
         }
         .alert("Restart Leg?", isPresented: $isShowingRestartAlert) {
             Button("Cancel", role: .cancel) {}
@@ -178,20 +203,20 @@ struct DartsGameView: View {
             LazyVGrid(columns: numberColumns, spacing: 8) {
                 ForEach(1...20, id: \.self) { value in
                     Button("\(value)") {
-                        game.submitThrow(segment: .number(value), multiplier: selectedMultiplier)
+                        submitThrowAndReset(.number(value), multiplier: selectedMultiplier)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(game.winner != nil)
                 }
 
                 Button(selectedMultiplier == .single ? "25" : "Bull") {
-                    game.submitThrow(segment: .bull, multiplier: selectedMultiplier)
+                    submitThrowAndReset(.bull, multiplier: selectedMultiplier)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(game.winner != nil || selectedMultiplier == .triple)
 
                 Button("0") {
-                    game.submitThrow(segment: .number(0), multiplier: .single)
+                    submitThrowAndReset(.number(0), multiplier: .single)
                 }
                 .buttonStyle(.bordered)
                 .disabled(game.winner != nil)
@@ -216,10 +241,12 @@ struct DartsGameView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Button("New Leg (Random)") {
-                        game.restartLegRandomSequence()
+                    if game.setWinner == nil {
+                        Button("New Leg (Random)") {
+                            game.restartLegRandomSequence()
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .buttonStyle(.borderedProminent)
 
                     Button("New Game") {
                         presentNewGameSetup()
@@ -232,7 +259,17 @@ struct DartsGameView: View {
     }
 
     private var winningSubtitle: String {
-        game.finishRule == .doubleOut ? "Finished with a double-out." : "Finished with single-out rules."
+        if game.setWinner != nil {
+            return "Set complete."
+        }
+        let outText = game.finishRule == .doubleOut ? "double-out" : "single-out"
+        let inText = game.inRule == .doubleIn ? "double-in" : "default-in"
+        return "Played \(inText), \(outText)."
+    }
+
+    private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
+        game.submitThrow(segment: segment, multiplier: multiplier)
+        selectedMultiplier = .single
     }
 
     private func presentNewGameSetup() {
@@ -240,7 +277,10 @@ struct DartsGameView: View {
             SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
         }
         setupFinishRule = game.finishRule
+        setupInRule = game.inRule
         setupStartScore = StartScoreOption(rawValue: game.startingScore) ?? .score501
+        setupSetModeEnabled = game.setModeEnabled
+        setupLegsToWin = game.legsToWin
         isShowingNewGameSetup = true
     }
 
@@ -256,7 +296,10 @@ struct DartsGameView: View {
 private struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
     @Binding var finishRule: FinishRule
+    @Binding var inRule: InRule
     @Binding var startScore: StartScoreOption
+    @Binding var setModeEnabled: Bool
+    @Binding var legsToWin: Int
 
     let onCancel: () -> Void
     let onStart: () -> Void
@@ -280,6 +323,18 @@ private struct NewGameSetupView: View {
                         }
                     }
                     .pickerStyle(.menu)
+
+                    Picker("In Mode", selection: $inRule) {
+                        ForEach(InRule.allCases) { rule in
+                            Text(rule.rawValue).tag(rule)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Toggle("Set Mode", isOn: $setModeEnabled)
+                    if setModeEnabled {
+                        Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
+                    }
                 }
 
                 Section("Player Order") {

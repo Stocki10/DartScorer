@@ -1,0 +1,16 @@
+{
+  "source": "/Users/leonstockmann/git/DartScorer/DartScorer/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "DartScorer",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 7
+        }
+      }
+    ]
+  },
+  "version": 1
+}

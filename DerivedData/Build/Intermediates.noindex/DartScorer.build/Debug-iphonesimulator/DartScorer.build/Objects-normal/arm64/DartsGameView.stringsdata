@@ -1,0 +1,272 @@
+{
+  "source": "/Users/leonstockmann/git/DartScorer/DartScorer/DartsGameView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Restart Leg?",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 151
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "⌀ %@",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Active: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "No throws",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "Restart Leg",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "You already started this leg. This will discard current progress.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 157
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Game",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "Restart Leg",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 168
+        }
+      },
+      {
+        "comment": "",
+        "key": "Multiplier",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 189
+        }
+      },
+      {
+        "comment": "",
+        "key": "Throw",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "25",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 212
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bull",
+        "location": {
+          "startingColumn": 63,
+          "startingLine": 212
+        }
+      },
+      {
+        "comment": "",
+        "key": "0",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 218
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 205
+        }
+      },
+      {
+        "comment": "",
+        "key": "Leg Won",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Leg (Random)",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 245
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Game",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 251
+        }
+      },
+      {
+        "comment": "",
+        "key": "New Game",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 360
+        }
+      },
+      {
+        "comment": "",
+        "key": "Game Settings",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 310
+        }
+      },
+      {
+        "comment": "",
+        "key": "Player Order",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 340
+        }
+      },
+      {
+        "comment": "",
+        "key": "Players: %lld",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 311
+        }
+      },
+      {
+        "comment": "",
+        "key": "Game",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 313
+        }
+      },
+      {
+        "comment": "",
+        "key": "Finish Mode",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 320
+        }
+      },
+      {
+        "comment": "",
+        "key": "In Mode",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 327
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set Mode",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 334
+        }
+      },
+      {
+        "comment": "",
+        "key": "Legs to Win: %lld",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 336
+        }
+      },
+      {
+        "comment": "",
+        "key": "Drag rows to set the throw sequence.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 341
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 363
+        }
+      },
+      {
+        "comment": "",
+        "key": "Start",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 366
+        }
+      }
+    ]
+  },
+  "version": 1
+}

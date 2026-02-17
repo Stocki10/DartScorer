@@ -49,6 +49,16 @@ struct DartScorerTests {
         #expect(game.winner?.name == "Player 1")
     }
 
+    @Test func doubleInRequiresDoubleToStartScoring() {
+        let game = DartsGame(playerCount: 2, inRule: .doubleIn)
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        #expect(game.players[0].score == 501)
+
+        game.submitThrow(segment: .number(20), multiplier: .double)
+        #expect(game.players[0].score == 461)
+    }
+
     @Test func playerSwitchesAfterThreeDarts() {
         let game = DartsGame(playerCount: 2)
 
@@ -140,6 +150,20 @@ struct DartScorerTests {
         #expect(Set(game.players.map(\.name)) == namesBefore)
         #expect(game.players.allSatisfy { $0.score == 501 })
         #expect(game.activePlayerIndex == 0)
+    }
+
+    @Test func setModeTracksLegWins() {
+        let game = DartsGame(playerCount: 2, setModeEnabled: true, legsToWin: 2)
+        let orderBefore = game.players.map(\.id)
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        #expect(game.legsWonByPlayerID.values.reduce(0, +) == 1)
+        #expect(game.setWinner == nil)
+        #expect(game.winner == nil)
+        #expect(game.players.map(\.id) == Array(orderBefore.reversed()))
     }
 
     @Test func legAverageUsesScoredPointsPerThreeDarts() {

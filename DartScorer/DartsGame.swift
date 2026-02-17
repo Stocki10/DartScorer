@@ -17,6 +17,13 @@ enum StartScoreOption: Int, CaseIterable, Identifiable {
     var label: String { "\(rawValue)" }
 }
 
+enum InRule: String, CaseIterable, Identifiable {
+    case `default` = "Default"
+    case doubleIn = "Double In"
+
+    var id: String { rawValue }
+}
+
 final class DartsGame: ObservableObject {
     @Published var players: [Player]
     @Published private(set) var activePlayerIndex: Int = 0
@@ -24,19 +31,37 @@ final class DartsGame: ObservableObject {
     @Published private(set) var winner: Player?
     @Published private(set) var statusMessage: String?
     @Published private(set) var finishRule: FinishRule
+    @Published private(set) var inRule: InRule
     @Published private(set) var startingScore: Int
+    @Published private(set) var setModeEnabled: Bool
+    @Published private(set) var legsToWin: Int
+    @Published private(set) var legsWonByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var setWinner: Player?
     @Published private(set) var lastTurnThrowsByPlayerID: [UUID: [Int]] = [:]
     @Published private(set) var pointsScoredByPlayerID: [UUID: Int] = [:]
     @Published private(set) var dartsThrownByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var hasOpenedLegByPlayerID: [UUID: Bool] = [:]
 
     private var history: [GameSnapshot] = []
 
-    init(playerCount: Int = 2, startingScore: Int = 501, finishRule: FinishRule = .doubleOut) {
+    init(
+        playerCount: Int = 2,
+        startingScore: Int = 501,
+        finishRule: FinishRule = .doubleOut,
+        inRule: InRule = .default,
+        setModeEnabled: Bool = false,
+        legsToWin: Int = 3
+    ) {
         let clampedCount = min(max(1, playerCount), 4)
         self.startingScore = startingScore
         self.finishRule = finishRule
+        self.inRule = inRule
+        self.setModeEnabled = setModeEnabled
+        self.legsToWin = max(1, legsToWin)
         self.players = (1...clampedCount).map { Player(name: "Player \($0)", score: startingScore) }
-        self.currentTurn = Turn(startingScore: startingScore)
+        self.currentTurn = Turn(startingScore: startingScore, openedAtTurnStart: inRule == .default)
+        resetSetState()
+        resetOpenState()
         resetLegStats()
     }
 
@@ -87,24 +112,38 @@ final class DartsGame: ObservableObject {
         statusMessage = nil
 
         let player = activePlayer
-        let proposedScore = player.score - throwValue.points
+        let effectivePoints = effectivePointsForThrow(throwValue, playerID: player.id)
+        let proposedScore = player.score - effectivePoints
 
         appendThrowToHistory(playerID: player.id, points: throwValue.points)
         recordDartThrown(for: player.id)
 
-        if isBust(proposedScore: proposedScore, throwValue: throwValue) {
+        if isBust(proposedScore: proposedScore, throwValue: throwValue, effectivePoints: effectivePoints) {
             rollbackTurnScoringForBust(playerID: player.id)
+            hasOpenedLegByPlayerID[player.id] = currentTurn.openedAtTurnStart
             handleBust(for: player)
             return
         }
 
-        addScoredPoints(throwValue.points, for: player.id)
+        addScoredPoints(effectivePoints, for: player.id)
         players[activePlayerIndex].score = proposedScore
         currentTurn.darts.append(throwValue)
 
         if proposedScore == 0 {
-            winner = players[activePlayerIndex]
-            statusMessage = "\(player.name) wins the leg."
+            let winningPlayer = players[activePlayerIndex]
+            if setModeEnabled {
+                legsWonByPlayerID[winningPlayer.id, default: 0] += 1
+                if (legsWonByPlayerID[winningPlayer.id] ?? 0) >= legsToWin {
+                    winner = winningPlayer
+                    setWinner = winningPlayer
+                    statusMessage = "\(winningPlayer.name) wins the set."
+                } else {
+                    startNewLeg(randomSequence: false, invertedSequence: true)
+                }
+            } else {
+                winner = winningPlayer
+                statusMessage = "\(winningPlayer.name) wins the leg."
+            }
             return
         }
 
@@ -114,30 +153,67 @@ final class DartsGame: ObservableObject {
     }
 
     func restartLeg() {
-        startNewLeg(randomSequence: false)
+        startNewLeg(randomSequence: false, invertedSequence: false)
     }
 
     func restartLegRandomSequence() {
-        startNewLeg(randomSequence: true)
+        startNewLeg(randomSequence: true, invertedSequence: false)
+    }
+
+    func restartLegInvertedSequence() {
+        startNewLeg(randomSequence: false, invertedSequence: true)
     }
 
     func newGame(playerNames: [String], finishRule: FinishRule, startingScore: Int) {
+        newGame(
+            playerNames: playerNames,
+            finishRule: finishRule,
+            inRule: inRule,
+            startingScore: startingScore,
+            setModeEnabled: setModeEnabled,
+            legsToWin: legsToWin
+        )
+    }
+
+    func newGame(
+        playerNames: [String],
+        finishRule: FinishRule,
+        inRule: InRule,
+        startingScore: Int,
+        setModeEnabled: Bool,
+        legsToWin: Int
+    ) {
         history.removeAll()
         lastTurnThrowsByPlayerID.removeAll()
-        resetLegStats()
         let preparedNames = sanitizeAndClampNames(playerNames)
         self.startingScore = startingScore
         self.finishRule = finishRule
+        self.inRule = inRule
+        self.setModeEnabled = setModeEnabled
+        self.legsToWin = max(1, legsToWin)
         players = preparedNames.map { Player(name: $0, score: self.startingScore) }
+        resetSetState()
+        resetOpenState()
         resetLegStats()
         winner = nil
+        setWinner = nil
         statusMessage = nil
         activePlayerIndex = 0
-        currentTurn = Turn(startingScore: self.startingScore)
+        currentTurn = Turn(
+            startingScore: self.startingScore,
+            openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
+        )
     }
 
     func newGame(playerNames: [String], finishRule: FinishRule) {
-        newGame(playerNames: playerNames, finishRule: finishRule, startingScore: startingScore)
+        newGame(
+            playerNames: playerNames,
+            finishRule: finishRule,
+            inRule: inRule,
+            startingScore: startingScore,
+            setModeEnabled: setModeEnabled,
+            legsToWin: legsToWin
+        )
     }
 
     func newGame(playerCount: Int) {
@@ -145,7 +221,14 @@ final class DartsGame: ObservableObject {
         let names = (1...clampedCount).map { index in
             players.indices.contains(index - 1) ? players[index - 1].name : "Player \(index)"
         }
-        newGame(playerNames: names, finishRule: finishRule, startingScore: startingScore)
+        newGame(
+            playerNames: names,
+            finishRule: finishRule,
+            inRule: inRule,
+            startingScore: startingScore,
+            setModeEnabled: setModeEnabled,
+            legsToWin: legsToWin
+        )
     }
 
     func updatePlayerName(index: Int, name: String) {
@@ -161,9 +244,15 @@ final class DartsGame: ObservableObject {
         currentTurn = previous.currentTurn
         winner = previous.winner
         statusMessage = previous.statusMessage
+        inRule = previous.inRule
+        setModeEnabled = previous.setModeEnabled
+        legsToWin = previous.legsToWin
+        legsWonByPlayerID = previous.legsWonByPlayerID
+        setWinner = previous.setWinner
         lastTurnThrowsByPlayerID = previous.lastTurnThrowsByPlayerID
         pointsScoredByPlayerID = previous.pointsScoredByPlayerID
         dartsThrownByPlayerID = previous.dartsThrownByPlayerID
+        hasOpenedLegByPlayerID = previous.hasOpenedLegByPlayerID
     }
 
     func lastTurnThrows(for player: Player) -> [Int] {
@@ -177,7 +266,12 @@ final class DartsGame: ObservableObject {
         return (Double(points) / Double(darts)) * 3.0
     }
 
-    private func isBust(proposedScore: Int, throwValue: DartThrow) -> Bool {
+    func legsWon(for player: Player) -> Int {
+        legsWonByPlayerID[player.id] ?? 0
+    }
+
+    private func isBust(proposedScore: Int, throwValue: DartThrow, effectivePoints: Int) -> Bool {
+        if effectivePoints == 0 { return false }
         if proposedScore < 0 { return true }
         if finishRule == .doubleOut {
             if proposedScore == 1 { return true }
@@ -195,17 +289,23 @@ final class DartsGame: ObservableObject {
     private func endTurn() {
         activePlayerIndex = (activePlayerIndex + 1) % players.count
         let nextScore = players[activePlayerIndex].score
-        currentTurn = Turn(startingScore: nextScore)
+        let nextPlayer = players[activePlayerIndex]
+        currentTurn = Turn(
+            startingScore: nextScore,
+            openedAtTurnStart: hasOpenedLegByPlayerID[nextPlayer.id] ?? (inRule == .default)
+        )
     }
 
-    private func startNewLeg(randomSequence: Bool) {
+    private func startNewLeg(randomSequence: Bool, invertedSequence: Bool) {
         history.removeAll()
         lastTurnThrowsByPlayerID.removeAll()
         resetLegStats()
         winner = nil
         statusMessage = nil
 
-        if randomSequence {
+        if invertedSequence {
+            players.reverse()
+        } else if randomSequence {
             let previousStarterID = players.first?.id
             players.shuffle()
             if players.count > 1, let previousStarterID, players.first?.id == previousStarterID {
@@ -216,10 +316,14 @@ final class DartsGame: ObservableObject {
         }
 
         activePlayerIndex = 0
+        resetOpenState()
         for index in players.indices {
             players[index].score = startingScore
         }
-        currentTurn = Turn(startingScore: startingScore)
+        currentTurn = Turn(
+            startingScore: startingScore,
+            openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
+        )
     }
 
     private func bestFinishRoute(for score: Int, dartsRemaining: Int) -> [DartThrow]? {
@@ -318,6 +422,20 @@ final class DartsGame: ObservableObject {
 
         return result
     }
+
+    private func effectivePointsForThrow(_ throwValue: DartThrow, playerID: UUID) -> Int {
+        if inRule == .doubleIn {
+            if hasOpenedLegByPlayerID[playerID] == true {
+                return throwValue.points
+            }
+            if throwValue.isDouble {
+                hasOpenedLegByPlayerID[playerID] = true
+                return throwValue.points
+            }
+            return 0
+        }
+        return throwValue.points
+    }
 }
 
 private struct GameSnapshot {
@@ -326,9 +444,15 @@ private struct GameSnapshot {
     let currentTurn: Turn
     let winner: Player?
     let statusMessage: String?
+    let inRule: InRule
+    let setModeEnabled: Bool
+    let legsToWin: Int
+    let legsWonByPlayerID: [UUID: Int]
+    let setWinner: Player?
     let lastTurnThrowsByPlayerID: [UUID: [Int]]
     let pointsScoredByPlayerID: [UUID: Int]
     let dartsThrownByPlayerID: [UUID: Int]
+    let hasOpenedLegByPlayerID: [UUID: Bool]
 }
 
 private extension DartsGame {
@@ -349,9 +473,15 @@ private extension DartsGame {
                 currentTurn: currentTurn,
                 winner: winner,
                 statusMessage: statusMessage,
+                inRule: inRule,
+                setModeEnabled: setModeEnabled,
+                legsToWin: legsToWin,
+                legsWonByPlayerID: legsWonByPlayerID,
+                setWinner: setWinner,
                 lastTurnThrowsByPlayerID: lastTurnThrowsByPlayerID,
                 pointsScoredByPlayerID: pointsScoredByPlayerID,
-                dartsThrownByPlayerID: dartsThrownByPlayerID
+                dartsThrownByPlayerID: dartsThrownByPlayerID,
+                hasOpenedLegByPlayerID: hasOpenedLegByPlayerID
             )
         )
     }
@@ -385,5 +515,20 @@ private extension DartsGame {
     func rollbackTurnScoringForBust(playerID: UUID) {
         let turnPoints = currentTurn.darts.reduce(0) { $0 + $1.points }
         pointsScoredByPlayerID[playerID, default: 0] -= turnPoints
+    }
+
+    func resetSetState() {
+        legsWonByPlayerID = [:]
+        for player in players {
+            legsWonByPlayerID[player.id] = 0
+        }
+        setWinner = nil
+    }
+
+    func resetOpenState() {
+        hasOpenedLegByPlayerID = [:]
+        for player in players {
+            hasOpenedLegByPlayerID[player.id] = (inRule == .default)
+        }
     }
 }
