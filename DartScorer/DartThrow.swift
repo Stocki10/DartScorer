@@ -57,7 +57,7 @@ struct DartThrow: Equatable {
     static func isValid(segment: DartSegment, multiplier: DartMultiplier) -> Bool {
         switch segment {
         case .number(let value):
-            return (1...20).contains(value)
+            return (0...20).contains(value)
         case .bull:
             return multiplier != .triple
         }

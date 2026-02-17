@@ -7,6 +7,7 @@ struct DartsGameView: View {
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupFinishRule: FinishRule = .doubleOut
     @State private var setupStartScore: StartScoreOption = .score501
+    @State private var isShowingRestartAlert = false
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -122,6 +123,14 @@ struct DartsGameView: View {
                 }
             )
         }
+        .alert("Restart Leg?", isPresented: $isShowingRestartAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Restart Leg", role: .destructive) {
+                game.restartLeg()
+            }
+        } message: {
+            Text("You already started this leg. This will discard current progress.")
+        }
     }
 
     private var controlBar: some View {
@@ -132,7 +141,11 @@ struct DartsGameView: View {
             .buttonStyle(.bordered)
 
             Button("Restart Leg") {
-                game.restartLeg()
+                if game.isLegInProgress {
+                    isShowingRestartAlert = true
+                } else {
+                    game.restartLeg()
+                }
             }
             .buttonStyle(.bordered)
 
@@ -176,6 +189,12 @@ struct DartsGameView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(game.winner != nil || selectedMultiplier == .triple)
+
+                Button("0") {
+                    game.submitThrow(segment: .number(0), multiplier: .single)
+                }
+                .buttonStyle(.bordered)
+                .disabled(game.winner != nil)
             }
         }
     }
@@ -231,6 +250,7 @@ struct DartsGameView: View {
         }
         return game.lastTurnThrows(for: player)
     }
+
 }
 
 private struct NewGameSetupView: View {
@@ -285,7 +305,7 @@ private struct NewGameSetupView: View {
             .navigationTitle("New Game")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button("Cancel", role: .destructive, action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)

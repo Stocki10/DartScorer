@@ -56,17 +56,22 @@ final class DartsGame: ObservableObject {
         guard winner == nil else { return "" }
         let score = activePlayer.score
         let darts = remainingDarts
-        guard darts > 0 else { return "Best Finish: Not available" }
+        guard darts > 0 else { return "No finish available" }
 
         if let route = bestFinishRoute(for: score, dartsRemaining: darts) {
             let text = route.map(throwNotation).joined(separator: " ")
-            return "Best Finish: \(text)"
+            return "\(text)"
         }
-        return "Best Finish: Not available"
+        return "No finish available"
     }
 
     var hasBestPossibleFinish: Bool {
-        bestPossibleFinishLine != "Best Finish: Not available"
+        bestPossibleFinishLine != "No finish available"
+    }
+
+    var isLegInProgress: Bool {
+        guard winner == nil else { return false }
+        return dartsThrownByPlayerID.values.contains { $0 > 0 }
     }
 
     func submitThrow(segment: DartSegment, multiplier: DartMultiplier) {
