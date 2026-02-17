@@ -13,10 +13,6 @@ struct DartsGameView: View {
         ZStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Darts 501")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
                     controlBar
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -54,8 +50,6 @@ struct DartsGameView: View {
                     Group {
                         Text("Active: \(game.activePlayer.name)")
                             .fontWeight(.medium)
-                        Text("Darts remaining: \(game.remainingDarts)")
-                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
