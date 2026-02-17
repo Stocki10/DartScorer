@@ -74,6 +74,9 @@ struct DartsGameView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                    Text(game.bestPossibleFinishLine)
+                        .foregroundStyle(.secondary)
+
                     if let statusMessage = game.statusMessage {
                         Text(statusMessage)
                             .foregroundStyle(.secondary)

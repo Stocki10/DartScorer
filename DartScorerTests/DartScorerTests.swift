@@ -120,4 +120,12 @@ struct DartScorerTests {
         #expect(game.activePlayerIndex == 0)
         #expect(game.players.allSatisfy { $0.score == 501 })
     }
+
+    @Test func bestPossibleFinishShowsCheckoutRoute() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+
+        #expect(game.bestPossibleFinishLine == "Best Finish: D20")
+    }
 }

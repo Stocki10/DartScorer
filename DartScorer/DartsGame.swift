@@ -40,6 +40,19 @@ final class DartsGame: ObservableObject {
         !history.isEmpty
     }
 
+    var bestPossibleFinishLine: String {
+        guard winner == nil else { return "" }
+        let score = activePlayer.score
+        let darts = remainingDarts
+        guard darts > 0 else { return "Best Finish: Not available" }
+
+        if let route = bestFinishRoute(for: score, dartsRemaining: darts) {
+            let text = route.map(throwNotation).joined(separator: " ")
+            return "\(text)"
+        }
+        return "Best Finish: Not available"
+    }
+
     func submitThrow(segment: DartSegment, multiplier: DartMultiplier) {
         guard winner == nil else { return }
         guard remainingDarts > 0 else { return }
@@ -141,7 +154,7 @@ final class DartsGame: ObservableObject {
 
     private func handleBust(for player: Player) {
         players[activePlayerIndex].score = currentTurn.startingScore
-        statusMessage = "Bust for \(player.name)."
+        // statusMessage = "Bust for \(player.name)."
         endTurn()
     }
 
@@ -149,6 +162,103 @@ final class DartsGame: ObservableObject {
         activePlayerIndex = (activePlayerIndex + 1) % players.count
         let nextScore = players[activePlayerIndex].score
         currentTurn = Turn(startingScore: nextScore)
+    }
+
+    private func bestFinishRoute(for score: Int, dartsRemaining: Int) -> [DartThrow]? {
+        guard score > 0 else { return nil }
+        let candidates = checkoutCandidates
+
+        for dartCount in 1...dartsRemaining {
+            if let route = findRoute(
+                target: score,
+                dartsLeft: dartCount,
+                candidates: candidates,
+                current: []
+            ) {
+                return route
+            }
+        }
+        return nil
+    }
+
+    private func findRoute(target: Int, dartsLeft: Int, candidates: [DartThrow], current: [DartThrow]) -> [DartThrow]? {
+        guard target >= 0 else { return nil }
+        guard dartsLeft > 0 else { return nil }
+
+        for dart in candidates {
+            let remaining = target - dart.points
+            if remaining < 0 { continue }
+
+            if dartsLeft == 1 {
+                if remaining == 0 && canFinish(with: dart) {
+                    return current + [dart]
+                }
+                continue
+            }
+
+            if let route = findRoute(
+                target: remaining,
+                dartsLeft: dartsLeft - 1,
+                candidates: candidates,
+                current: current + [dart]
+            ) {
+                return route
+            }
+        }
+        return nil
+    }
+
+    private func canFinish(with dart: DartThrow) -> Bool {
+        switch finishRule {
+        case .singleOut:
+            return true
+        case .doubleOut:
+            return dart.isDouble
+        }
+    }
+
+    private func throwNotation(_ dart: DartThrow) -> String {
+        switch dart.segment {
+        case .number(let value):
+            switch dart.multiplier {
+            case .single:
+                return "\(value)"
+            case .double:
+                return "D\(value)"
+            case .triple:
+                return "T\(value)"
+            }
+        case .bull:
+            return dart.multiplier == .double ? "Bull" : "25"
+        }
+    }
+
+    private var checkoutCandidates: [DartThrow] {
+        var result: [DartThrow] = []
+
+        for value in stride(from: 20, through: 1, by: -1) {
+            if let triple = DartThrow(segment: .number(value), multiplier: .triple) {
+                result.append(triple)
+            }
+        }
+        for value in stride(from: 20, through: 1, by: -1) {
+            if let double = DartThrow(segment: .number(value), multiplier: .double) {
+                result.append(double)
+            }
+        }
+        for value in stride(from: 20, through: 1, by: -1) {
+            if let single = DartThrow(segment: .number(value), multiplier: .single) {
+                result.append(single)
+            }
+        }
+        if let bull = DartThrow(segment: .bull, multiplier: .double) {
+            result.append(bull)
+        }
+        if let outerBull = DartThrow(segment: .bull, multiplier: .single) {
+            result.append(outerBull)
+        }
+
+        return result
     }
 }
 
