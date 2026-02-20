@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,6 +24,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -220,7 +219,7 @@ fun DartsGameScreen() {
                         renderTick++
                     },
                     enabled = game.canUndo
-                ) { Text("Undo") }
+                ) { Text("↶") }
             }
 
             key(renderTick) {
@@ -246,7 +245,6 @@ fun DartsGameScreen() {
                 game.statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
 
-            Text("Multiplier", style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DartMultiplier.entries.forEach { multiplier ->
                     FilterChip(
@@ -257,7 +255,6 @@ fun DartsGameScreen() {
                 }
             }
 
-            Text("Throw", style = MaterialTheme.typography.titleSmall)
             val throwButtons = (1..20).map { it.toString() } + listOf(
                 if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
                 "0"
@@ -453,122 +450,121 @@ private fun NewGameDialog(
         onDismissRequest = {},
         title = { Text("New Game") },
         text = {
-            Column(
+            LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Players: ${setupPlayers.size}")
-                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
-                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size + 1) }) { Text("+") }
-                }
-
-                Text("Game")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartScoreOption.entries.forEach { option ->
-                        FilterChip(
-                            selected = startScore == option,
-                            onClick = { onStartScoreChange(option) },
-                            label = { Text(option.label) }
-                        )
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Players: ${setupPlayers.size}")
+                        OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
+                        OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size + 1) }) { Text("+") }
                     }
                 }
-
-                Text("Finish Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FinishRule.entries.forEach { rule ->
-                        FilterChip(
-                            selected = finishRule == rule,
-                            onClick = { onFinishRuleChange(rule) },
-                            label = { Text(rule.label) }
-                        )
-                    }
-                }
-
-                Text("In Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InRule.entries.forEach { rule ->
-                        FilterChip(
-                            selected = inRule == rule,
-                            onClick = { onInRuleChange(rule) },
-                            label = { Text(rule.label) }
-                        )
-                    }
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(
-                        selected = setModeEnabled,
-                        onClick = { onSetModeChange(!setModeEnabled) },
-                        label = { Text("Set Mode") }
-                    )
-                    if (setModeEnabled) {
-                        Text("Legs to win: $legsToWin")
-                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
-                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
-                    }
-                }
-
-                Text("Player Order")
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 320.dp)
-                ) {
-                    setupPlayers.forEachIndexed { index, player ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .graphicsLayer {
-                                    translationY = if (draggedIndex == index) draggedOffsetY else 0f
-                                }
-                                .zIndex(if (draggedIndex == index) 1f else 0f)
-                                .pointerInput(index) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            draggedIndex = index
-                                            draggedOffsetY = 0f
-                                        },
-                                        onDragCancel = {
-                                            draggedIndex = null
-                                            draggedOffsetY = 0f
-                                        },
-                                        onDragEnd = {
-                                            draggedIndex = null
-                                            draggedOffsetY = 0f
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            var currentIndex = draggedIndex ?: return@detectDragGesturesAfterLongPress
-                                            draggedOffsetY += dragAmount.y
-
-                                            while (draggedOffsetY > rowHeightPx && currentIndex < setupPlayers.lastIndex) {
-                                                movePlayer(currentIndex, currentIndex + 1)
-                                                currentIndex += 1
-                                                draggedOffsetY -= rowHeightPx
-                                            }
-                                            while (draggedOffsetY < -rowHeightPx && currentIndex > 0) {
-                                                movePlayer(currentIndex, currentIndex - 1)
-                                                currentIndex -= 1
-                                                draggedOffsetY += rowHeightPx
-                                            }
-                                            draggedIndex = currentIndex
-                                        }
-                                    )
-                                }
-                        ) {
-                            OutlinedTextField(
-                                value = player.name,
-                                onValueChange = { setupPlayers[index] = player.copy(name = it) },
-                                label = { Text(player.defaultName) },
-                                singleLine = true,
-                                modifier = Modifier.weight(1f)
+                item {
+                    Text("Game")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StartScoreOption.entries.forEach { option ->
+                            FilterChip(
+                                selected = startScore == option,
+                                onClick = { onStartScoreChange(option) },
+                                label = { Text(option.label) }
                             )
+                        }
+                    }
+                }
+                item {
+                    Text("Finish Mode")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FinishRule.entries.forEach { rule ->
+                            FilterChip(
+                                selected = finishRule == rule,
+                                onClick = { onFinishRuleChange(rule) },
+                                label = { Text(rule.label) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    Text("In Mode")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        InRule.entries.forEach { rule ->
+                            FilterChip(
+                                selected = inRule == rule,
+                                onClick = { onInRuleChange(rule) },
+                                label = { Text(rule.label) }
+                            )
+                        }
+                    }
+                }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(
+                            selected = setModeEnabled,
+                            onClick = { onSetModeChange(!setModeEnabled) },
+                            label = { Text("Set Mode") }
+                        )
+                        if (setModeEnabled) {
+                            Text("Legs to win: $legsToWin")
+                            OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
+                            OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
+                        }
+                    }
+                }
+                item { Text("Player Order") }
+                items(setupPlayers.size) { index ->
+                    val player = setupPlayers[index]
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                translationY = if (draggedIndex == index) draggedOffsetY else 0f
+                            }
+                            .zIndex(if (draggedIndex == index) 1f else 0f)
+                            .pointerInput(index) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggedIndex = index
+                                        draggedOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggedIndex = null
+                                        draggedOffsetY = 0f
+                                    },
+                                    onDragEnd = {
+                                        draggedIndex = null
+                                        draggedOffsetY = 0f
+                                    },
+                                    onDrag = { _, dragAmount ->
+                                        var currentIndex = draggedIndex ?: return@detectDragGesturesAfterLongPress
+                                        draggedOffsetY += dragAmount.y
+
+                                        while (draggedOffsetY > rowHeightPx && currentIndex < setupPlayers.lastIndex) {
+                                            movePlayer(currentIndex, currentIndex + 1)
+                                            currentIndex += 1
+                                            draggedOffsetY -= rowHeightPx
+                                        }
+                                        while (draggedOffsetY < -rowHeightPx && currentIndex > 0) {
+                                            movePlayer(currentIndex, currentIndex - 1)
+                                            currentIndex -= 1
+                                            draggedOffsetY += rowHeightPx
+                                        }
+                                        draggedIndex = currentIndex
+                                    }
+                                )
+                            }
+                    ) {
+                        OutlinedTextField(
+                            value = player.name,
+                            onValueChange = { setupPlayers[index] = player.copy(name = it) },
+                            label = { Text(player.defaultName) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
                             Text("Drag", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
