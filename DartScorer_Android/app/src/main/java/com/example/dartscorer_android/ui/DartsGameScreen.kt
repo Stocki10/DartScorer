@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -219,7 +220,12 @@ fun DartsGameScreen() {
                         renderTick++
                     },
                     enabled = game.canUndo
-                ) { Text("↶") }
+                ) {
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_menu_revert),
+                        contentDescription = "Undo"
+                    )
+                }
             }
 
             key(renderTick) {
@@ -507,7 +513,7 @@ private fun NewGameDialog(
                             label = { Text("Set Mode") }
                         )
                         if (setModeEnabled) {
-                            Text("Legs to win: $legsToWin")
+                            Text("Legs: $legsToWin")
                             OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
                             OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
                         }
@@ -565,8 +571,11 @@ private fun NewGameDialog(
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
-                            Text("Drag", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_menu_sort_by_size),
+                            contentDescription = "Drag Handle",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
