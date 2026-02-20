@@ -324,7 +324,7 @@ class DartsGame(
                 }
             }
 
-            DartSegment.Bull -> if (dart.multiplier == DartMultiplier.DOUBLE) "Bull" else "25"
+            DartSegment.Bull -> if (dart.multiplier == DartMultiplier.SINGLE) "25" else "Bull"
         }
     }
 

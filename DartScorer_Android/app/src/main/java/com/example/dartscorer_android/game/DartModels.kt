@@ -50,7 +50,25 @@ data class DartThrow(
         get() = multiplier == DartMultiplier.DOUBLE
 
     val displayText: String
-        get() = "${multiplier.label} ${segment.label} ($points)"
+        get() {
+            return when (val currentSegment = segment) {
+                is DartSegment.Number -> {
+                    val value = currentSegment.value
+                    when (multiplier) {
+                        DartMultiplier.SINGLE -> value.toString()
+                        DartMultiplier.DOUBLE -> "D$value"
+                        DartMultiplier.TRIPLE -> "T$value"
+                    }
+                }
+                DartSegment.Bull -> {
+                    when (multiplier) {
+                        DartMultiplier.SINGLE -> "25"
+                        DartMultiplier.DOUBLE -> "Bull x2"
+                        DartMultiplier.TRIPLE -> "Bull"
+                    }
+                }
+            }
+        }
 
     companion object {
         fun isValid(segment: DartSegment, multiplier: DartMultiplier): Boolean {

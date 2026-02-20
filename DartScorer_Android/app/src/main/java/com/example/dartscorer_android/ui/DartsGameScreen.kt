@@ -1,8 +1,8 @@
 package com.example.dartscorer_android.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -43,8 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.example.dartscorer_android.game.DartMultiplier
 import com.example.dartscorer_android.game.DartSegment
 import com.example.dartscorer_android.game.DartsGame
@@ -123,18 +128,6 @@ fun DartsGameScreen() {
                     }
                 } else if (clamped < setupPlayers.size) {
                     repeat(setupPlayers.size - clamped) { setupPlayers.removeAt(setupPlayers.lastIndex) }
-                }
-            },
-            onMovePlayerUp = { index ->
-                if (index > 0) {
-                    val item = setupPlayers.removeAt(index)
-                    setupPlayers.add(index - 1, item)
-                }
-            },
-            onMovePlayerDown = { index ->
-                if (index < setupPlayers.lastIndex) {
-                    val item = setupPlayers.removeAt(index)
-                    setupPlayers.add(index + 1, item)
                 }
             },
             onCancel = {
@@ -295,7 +288,7 @@ fun DartsGameScreen() {
                         enabled = enabled,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(label)
+                        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
                     }
                 }
             }
@@ -335,10 +328,7 @@ private fun Scoreboard(game: DartsGame, version: Int) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(player.name)
                             if (game.setModeEnabled) {
                                 Text(
@@ -353,10 +343,15 @@ private fun Scoreboard(game: DartsGame, version: Int) {
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
-                        }
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            throwsForBadge.forEach { value ->
-                                ChipText(value.toString())
+                            if (throwsForBadge.isNotEmpty()) {
+                                FlowRow(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    throwsForBadge.forEach { value ->
+                                        ChipText(value.toString())
+                                    }
+                                }
                             }
                         }
                     }
@@ -441,16 +436,30 @@ private fun NewGameDialog(
     legsToWin: Int,
     onLegsToWinChange: (Int) -> Unit,
     onPlayerCountChange: (Int) -> Unit,
-    onMovePlayerUp: (Int) -> Unit,
-    onMovePlayerDown: (Int) -> Unit,
     onCancel: () -> Unit,
     onStart: () -> Unit
 ) {
+    var draggedIndex by remember { mutableStateOf<Int?>(null) }
+    var draggedOffsetY by remember { mutableStateOf(0f) }
+    val rowHeightPx = 76f
+
+    fun movePlayer(from: Int, to: Int) {
+        if (from == to || from !in setupPlayers.indices || to !in setupPlayers.indices) return
+        val item = setupPlayers.removeAt(from)
+        setupPlayers.add(to, item)
+    }
+
     AlertDialog(
         onDismissRequest = {},
         title = { Text("New Game") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Players: ${setupPlayers.size}")
                     OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
@@ -508,13 +517,50 @@ private fun NewGameDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 280.dp)
+                        .heightIn(max = 320.dp)
                 ) {
                     setupPlayers.forEachIndexed { index, player ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    translationY = if (draggedIndex == index) draggedOffsetY else 0f
+                                }
+                                .zIndex(if (draggedIndex == index) 1f else 0f)
+                                .pointerInput(index) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            draggedIndex = index
+                                            draggedOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggedIndex = null
+                                            draggedOffsetY = 0f
+                                        },
+                                        onDragEnd = {
+                                            draggedIndex = null
+                                            draggedOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            var currentIndex = draggedIndex ?: return@detectDragGesturesAfterLongPress
+                                            draggedOffsetY += dragAmount.y
+
+                                            while (draggedOffsetY > rowHeightPx && currentIndex < setupPlayers.lastIndex) {
+                                                movePlayer(currentIndex, currentIndex + 1)
+                                                currentIndex += 1
+                                                draggedOffsetY -= rowHeightPx
+                                            }
+                                            while (draggedOffsetY < -rowHeightPx && currentIndex > 0) {
+                                                movePlayer(currentIndex, currentIndex - 1)
+                                                currentIndex -= 1
+                                                draggedOffsetY += rowHeightPx
+                                            }
+                                            draggedIndex = currentIndex
+                                        }
+                                    )
+                                }
                         ) {
                             OutlinedTextField(
                                 value = player.name,
@@ -523,18 +569,7 @@ private fun NewGameDialog(
                                 singleLine = true,
                                 modifier = Modifier.weight(1f)
                             )
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(
-                                    onClick = { onMovePlayerUp(index) },
-                                    enabled = index > 0,
-                                    modifier = Modifier.widthIn(min = 44.dp)
-                                ) { Text("↑") }
-                                TextButton(
-                                    onClick = { onMovePlayerDown(index) },
-                                    enabled = index < setupPlayers.lastIndex,
-                                    modifier = Modifier.widthIn(min = 44.dp)
-                                ) { Text("↓") }
-                            }
+                            Text("Drag", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
