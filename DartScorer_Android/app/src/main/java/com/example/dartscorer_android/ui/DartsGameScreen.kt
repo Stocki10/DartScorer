@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -49,6 +52,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.dartscorer_android.game.DartMultiplier
 import com.example.dartscorer_android.game.DartSegment
@@ -263,7 +267,10 @@ fun DartsGameScreen() {
 
             val throwButtons = (1..20).map { it.toString() } + listOf(
                 if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
-                "0"
+                "0",
+                "",
+                "",
+                "NO_SCORE"
             )
 
             LazyVerticalGrid(
@@ -273,6 +280,11 @@ fun DartsGameScreen() {
                 modifier = Modifier.heightIn(max = 280.dp)
             ) {
                 items(throwButtons) { label ->
+                    if (label.isEmpty()) {
+                        Spacer(modifier = Modifier.fillMaxWidth().height(1.dp))
+                        return@items
+                    }
+
                     val enabled = when (label) {
                         "25", "Bull" -> game.winner == null && selectedMultiplier != DartMultiplier.TRIPLE
                         else -> game.winner == null
@@ -283,15 +295,46 @@ fun DartsGameScreen() {
                             when (label) {
                                 "25", "Bull" -> game.submitThrow(DartSegment.Bull, selectedMultiplier)
                                 "0" -> game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
+                                "NO_SCORE" -> {
+                                    val used = game.currentTurn.darts.size
+                                    repeat(used) {
+                                        game.undoLastThrow()
+                                    }
+                                    repeat(3) {
+                                        game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
+                                    }
+                                }
                                 else -> game.submitThrow(DartSegment.Number(label.toInt()), selectedMultiplier)
                             }
                             selectedMultiplier = DartMultiplier.SINGLE
                             renderTick++
                         },
                         enabled = enabled,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = if (label == "NO_SCORE") {
+                            Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                        contentPadding = if (label == "NO_SCORE") {
+                            PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                        } else {
+                            ButtonDefaults.ContentPadding
+                        }
                     ) {
-                        Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                        if (label == "NO_SCORE") {
+                            Text(
+                                "No\nScore",
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Clip,
+                                fontSize = 11.sp,
+                                lineHeight = 12.sp
+                            )
+                        } else {
+                            Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                        }
                     }
                 }
             }

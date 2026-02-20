@@ -220,6 +220,18 @@ struct DartsGameView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(game.winner != nil)
+
+                Color.clear.frame(height: 1)
+                Color.clear.frame(height: 1)
+
+                Button("No Score") {
+                    submitNoScoreTurn()
+                }
+                .buttonStyle(.bordered)
+                .disabled(game.winner != nil)
+                .font(.footnote)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
             }
         }
     }
@@ -273,6 +285,17 @@ struct DartsGameView: View {
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
         game.submitThrow(segment: segment, multiplier: multiplier)
+        selectedMultiplier = .single
+    }
+
+    private func submitNoScoreTurn() {
+        let used = game.currentTurn.darts.count
+        for _ in 0..<used {
+            game.undoLastThrow()
+        }
+        for _ in 0..<3 {
+            game.submitThrow(segment: .number(0), multiplier: .single)
+        }
         selectedMultiplier = .single
     }
 
