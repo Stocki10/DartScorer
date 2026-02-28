@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DartsGameView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
+    @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
@@ -12,6 +13,7 @@ struct DartsGameView: View {
     @State private var setupLegsToWin = 3
     @State private var isShowingRestartAlert = false
     @State private var hasPresentedInitialSetup = false
+    @State private var isShowingThemeSettings = false
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -177,6 +179,27 @@ struct DartsGameView: View {
             Spacer(minLength: 0)
 
             Button {
+                isShowingThemeSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.bordered)
+            .popover(isPresented: $isShowingThemeSettings, arrowEdge: .top) {
+                NavigationStack {
+                    Form {
+                        Section("Appearance") {
+                            Toggle(isOn: darkModeBinding) {
+                                Label("Theme", systemImage: "moon.fill")
+                            }
+                        }
+                    }
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .frame(width: 320, height: 220)
+            }
+
+            Button {
                 game.undoLastThrow()
             } label: {
                 Image(systemName: "arrow.uturn.backward")
@@ -184,6 +207,15 @@ struct DartsGameView: View {
             .buttonStyle(.bordered)
             .disabled(!game.canUndo)
         }
+    }
+
+    private var darkModeBinding: Binding<Bool> {
+        Binding(
+            get: { appThemeModeRaw == AppThemeMode.dark.rawValue },
+            set: { isDark in
+                appThemeModeRaw = isDark ? AppThemeMode.dark.rawValue : AppThemeMode.light.rawValue
+            }
+        )
     }
 
     private var multiplierPicker: some View {
