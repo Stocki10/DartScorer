@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Xcode / Swift
+DerivedData/
+**/DerivedData/
+*.xcresult
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+.build/
+
+# Android / Gradle
+**/build/
+.gradle/
+local.properties
+captures/
+
+# Logs
+*.log
