@@ -3,6 +3,12 @@ import SwiftUI
 struct DartsGameView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
     @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
+    @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
+    @AppStorage("newGameFinishRule") private var storedNewGameFinishRuleRaw = FinishRule.doubleOut.rawValue
+    @AppStorage("newGameInRule") private var storedNewGameInRuleRaw = InRule.default.rawValue
+    @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
+    @AppStorage("newGameSetModeEnabled") private var storedNewGameSetModeEnabled = false
+    @AppStorage("newGameLegsToWin") private var storedNewGameLegsToWin = 3
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
@@ -77,6 +83,7 @@ struct DartsGameView: View {
                 legsToWin: $setupLegsToWin,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
+                    persistNewGameSettings()
                     game.newGame(
                         playerNames: setupPlayers.map(\.name),
                         finishRule: setupFinishRule,
@@ -328,14 +335,23 @@ struct DartsGameView: View {
     }
 
     private func presentNewGameSetup() {
-        setupPlayers = game.players.enumerated().map { index, player in
+        let persistedNames = persistedNewGamePlayerNames()
+        let fallbackNames = game.players.enumerated().map { index, player in
             SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
         }
-        setupFinishRule = game.finishRule
-        setupInRule = game.inRule
-        setupStartScore = StartScoreOption(rawValue: game.startingScore) ?? .score501
-        setupSetModeEnabled = game.setModeEnabled
-        setupLegsToWin = game.legsToWin
+        if persistedNames.isEmpty {
+            setupPlayers = fallbackNames
+        } else {
+            setupPlayers = persistedNames.enumerated().map { index, name in
+                SetupPlayer(name: name, defaultName: "Player \(index + 1)")
+            }
+        }
+
+        setupFinishRule = FinishRule(rawValue: storedNewGameFinishRuleRaw) ?? game.finishRule
+        setupInRule = InRule(rawValue: storedNewGameInRuleRaw) ?? game.inRule
+        setupStartScore = StartScoreOption(rawValue: storedNewGameStartScoreRaw) ?? (StartScoreOption(rawValue: game.startingScore) ?? .score501)
+        setupSetModeEnabled = storedNewGameSetModeEnabled
+        setupLegsToWin = max(1, storedNewGameLegsToWin)
         isShowingNewGameSetup = true
     }
 
@@ -348,6 +364,29 @@ struct DartsGameView: View {
 
     private func applySettings() {
         appThemeModeRaw = draftThemeMode.rawValue
+    }
+
+    private func persistNewGameSettings() {
+        let names = setupPlayers.map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
+        if let data = try? JSONEncoder().encode(names), let json = String(data: data, encoding: .utf8) {
+            storedNewGamePlayerNamesJSON = json
+        }
+        storedNewGameFinishRuleRaw = setupFinishRule.rawValue
+        storedNewGameInRuleRaw = setupInRule.rawValue
+        storedNewGameStartScoreRaw = setupStartScore.rawValue
+        storedNewGameSetModeEnabled = setupSetModeEnabled
+        storedNewGameLegsToWin = max(1, setupLegsToWin)
+    }
+
+    private func persistedNewGamePlayerNames() -> [String] {
+        guard let data = storedNewGamePlayerNamesJSON.data(using: .utf8),
+              let names = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        let trimmed = names
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return Array(trimmed.prefix(5))
     }
 
 }
