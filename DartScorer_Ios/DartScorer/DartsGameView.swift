@@ -28,12 +28,6 @@ struct DartsGameView: View {
                     .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    Group {
-                        Text("Active: \(game.activePlayer.name)")
-                            .fontWeight(.medium)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
 
                     Text(game.bestPossibleFinishLine)
                         .font(.subheadline)
@@ -48,8 +42,6 @@ struct DartsGameView: View {
                         Text(statusMessage)
                             .foregroundStyle(.secondary)
                     }
-
-                    multiplierPicker
                 }
                 .padding(.horizontal)
 
@@ -58,7 +50,10 @@ struct DartsGameView: View {
                 Divider()
                     .padding(.horizontal)
 
-                numberPad
+                VStack(alignment: .leading, spacing: 8) {
+                    multiplierPicker
+                    numberPad
+                }
                     .padding(.horizontal)
                     .padding(.bottom)
             }
@@ -174,6 +169,8 @@ struct DartsGameView: View {
             }
             .buttonStyle(.bordered)
 
+            Spacer(minLength: 0)
+
             Button {
                 game.undoLastThrow()
             } label: {
@@ -197,9 +194,6 @@ struct DartsGameView: View {
 
     private var numberPad: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Throw")
-                .font(.headline)
-
             LazyVGrid(columns: numberColumns, spacing: 8) {
                 ForEach(1...20, id: \.self) { value in
                     Button("\(value)") {
@@ -253,12 +247,6 @@ struct DartsGameView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
-                    Button("Back") {
-                        game.undoLastThrow()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(!game.canUndo)
-
                     if game.setWinner == nil {
                         Button("New Leg (Random)") {
                             game.restartLegRandomSequence()
@@ -273,6 +261,16 @@ struct DartsGameView: View {
                 }
             }
             .padding()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            Button("Back") {
+                game.undoLastThrow()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!game.canUndo)
+            .padding(.top, 12)
+            .padding(.trailing, 12)
         }
     }
 
