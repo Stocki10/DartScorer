@@ -182,6 +182,57 @@ struct DartScorerTests {
         game.players[0].score = 40
         game.currentTurn = Turn(startingScore: 40)
 
-        #expect(game.bestPossibleFinishLine == "Best Finish: D20")
+        #expect(game.bestPossibleFinishLine == "D20")
+    }
+
+    @Test func bestPossibleFinish170() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 170
+        game.currentTurn = Turn(startingScore: 170)
+
+        #expect(game.bestPossibleFinishLine == "T20 T20 Bull")
+    }
+
+    @Test func bestPossibleFinishNoFinishAvailable() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 1
+        game.currentTurn = Turn(startingScore: 1)
+
+        #expect(game.bestPossibleFinishLine == "No finish available")
+    }
+
+    @Test func bestPossibleFinishCacheInvalidatesOnUndo() {
+        let game = DartsGame(playerCount: 2)
+        
+        let initial = game.bestPossibleFinishLine
+        
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        
+        #expect(game.canUndo == true)
+        
+        game.undoLastThrow()
+        
+        #expect(game.bestPossibleFinishLine == initial)
+    }
+
+    @Test func bustOnScore1InDoubleOut() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 2
+        game.currentTurn = Turn(startingScore: 2)
+
+        game.submitThrow(segment: .number(1), multiplier: .single)
+
+        #expect(game.players[0].score == 2)
+        #expect(game.activePlayerIndex == 1)
+    }
+
+    @Test func doubleInOpensWithDouble() {
+        let game = DartsGame(playerCount: 2, inRule: .doubleIn)
+        
+        #expect(game.hasOpenedLegByPlayerID[game.players[0].id] == false)
+        
+        game.submitThrow(segment: .number(20), multiplier: .double)
+        
+        #expect(game.hasOpenedLegByPlayerID[game.players[0].id] == true)
     }
 }
