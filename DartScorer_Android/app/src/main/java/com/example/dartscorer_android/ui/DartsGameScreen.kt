@@ -1,8 +1,12 @@
 package com.example.dartscorer_android.ui
 
+import android.content.Context.MODE_PRIVATE
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -12,9 +16,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -28,6 +34,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +69,7 @@ import com.example.dartscorer_android.game.FinishRule
 import com.example.dartscorer_android.game.InRule
 import com.example.dartscorer_android.game.Player
 import com.example.dartscorer_android.game.StartScoreOption
+import com.example.dartscorer_android.ui.theme.AppColorTheme
 import kotlin.math.max
 
 private data class SetupPlayer(
@@ -71,20 +80,70 @@ private data class SetupPlayer(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DartsGameScreen() {
-    val game = remember { DartsGame(playerCount = 2) }
+fun DartsGameScreen(
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit,
+    selectedColorTheme: AppColorTheme,
+    onColorThemeChange: (AppColorTheme) -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences(APP_PREFS, MODE_PRIVATE) }
+    val initialNames = remember {
+        val raw = prefs.getString(KEY_SETUP_PLAYER_NAMES, null)
+        raw?.split(NAME_DELIMITER)
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.take(5)
+            .orEmpty()
+            .ifEmpty { listOf("Player 1", "Player 2") }
+    }
+    val initialFinishRule = remember {
+        prefs.getString(KEY_SETUP_FINISH_RULE, FinishRule.DOUBLE_OUT.name)
+            ?.let { runCatching { FinishRule.valueOf(it) }.getOrDefault(FinishRule.DOUBLE_OUT) }
+            ?: FinishRule.DOUBLE_OUT
+    }
+    val initialInRule = remember {
+        prefs.getString(KEY_SETUP_IN_RULE, InRule.DEFAULT.name)
+            ?.let { runCatching { InRule.valueOf(it) }.getOrDefault(InRule.DEFAULT) }
+            ?: InRule.DEFAULT
+    }
+    val initialStartScore = remember {
+        val stored = prefs.getInt(KEY_SETUP_START_SCORE, StartScoreOption.SCORE_501.score)
+        if (stored == StartScoreOption.SCORE_301.score) StartScoreOption.SCORE_301 else StartScoreOption.SCORE_501
+    }
+    val initialSetMode = remember { prefs.getBoolean(KEY_SETUP_SET_MODE, false) }
+    val initialLegsToWin = remember { prefs.getInt(KEY_SETUP_LEGS_TO_WIN, 3).coerceAtLeast(1) }
+
+    val game = remember {
+        DartsGame(
+            playerCount = initialNames.size,
+            startingScore = initialStartScore.score,
+            finishRule = initialFinishRule,
+            inRule = initialInRule,
+            setModeEnabled = initialSetMode,
+            legsToWin = initialLegsToWin
+        ).apply {
+            newGame(
+                playerNames = initialNames,
+                finishRule = initialFinishRule,
+                inRule = initialInRule,
+                startingScore = initialStartScore.score,
+                setModeEnabled = initialSetMode,
+                legsToWin = initialLegsToWin
+            )
+        }
+    }
     var renderTick by remember { mutableIntStateOf(0) }
     var selectedMultiplier by remember { mutableStateOf(DartMultiplier.SINGLE) }
     var showNewGameDialog by remember { mutableStateOf(true) }
     var showRestartDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     val setupPlayers = remember { mutableStateListOf<SetupPlayer>() }
-    var setupFinishRule by remember { mutableStateOf(FinishRule.DOUBLE_OUT) }
-    var setupInRule by remember { mutableStateOf(InRule.DEFAULT) }
-    var setupStartScore by remember { mutableStateOf(StartScoreOption.SCORE_501) }
-    var setupSetModeEnabled by remember { mutableStateOf(false) }
-    var setupLegsToWin by remember { mutableIntStateOf(3) }
-
-    renderTick
+    var setupFinishRule by remember { mutableStateOf(initialFinishRule) }
+    var setupInRule by remember { mutableStateOf(initialInRule) }
+    var setupStartScore by remember { mutableStateOf(initialStartScore) }
+    var setupSetModeEnabled by remember { mutableStateOf(initialSetMode) }
+    var setupLegsToWin by remember { mutableIntStateOf(initialLegsToWin) }
 
     fun syncSetupFromGame() {
         setupPlayers.clear()
@@ -100,6 +159,17 @@ fun DartsGameScreen() {
         setupStartScore = if (game.startingScore == 301) StartScoreOption.SCORE_301 else StartScoreOption.SCORE_501
         setupSetModeEnabled = game.setModeEnabled
         setupLegsToWin = game.legsToWin
+    }
+
+    fun persistSetupToPrefs() {
+        prefs.edit()
+            .putString(KEY_SETUP_PLAYER_NAMES, setupPlayers.map { it.name }.joinToString(NAME_DELIMITER))
+            .putString(KEY_SETUP_FINISH_RULE, setupFinishRule.name)
+            .putString(KEY_SETUP_IN_RULE, setupInRule.name)
+            .putInt(KEY_SETUP_START_SCORE, setupStartScore.score)
+            .putBoolean(KEY_SETUP_SET_MODE, setupSetModeEnabled)
+            .putInt(KEY_SETUP_LEGS_TO_WIN, setupLegsToWin)
+            .apply()
     }
 
     if (showNewGameDialog && setupPlayers.isEmpty()) {
@@ -120,7 +190,7 @@ fun DartsGameScreen() {
             legsToWin = setupLegsToWin,
             onLegsToWinChange = { setupLegsToWin = max(1, it) },
             onPlayerCountChange = { count ->
-                val clamped = count.coerceIn(1, 4)
+                val clamped = count.coerceIn(1, 5)
                 if (clamped > setupPlayers.size) {
                     val start = setupPlayers.size + 1
                     for (index in start..clamped) {
@@ -149,6 +219,7 @@ fun DartsGameScreen() {
                     setModeEnabled = setupSetModeEnabled,
                     legsToWin = setupLegsToWin
                 )
+                persistSetupToPrefs()
                 selectedMultiplier = DartMultiplier.SINGLE
                 showNewGameDialog = false
                 renderTick++
@@ -176,6 +247,16 @@ fun DartsGameScreen() {
         )
     }
 
+    if (showSettingsDialog) {
+        SettingsDialog(
+            isDarkTheme = isDarkTheme,
+            onThemeChange = onThemeChange,
+            selectedColorTheme = selectedColorTheme,
+            onColorThemeChange = onColorThemeChange,
+            onDismiss = { showSettingsDialog = false }
+        )
+    }
+
     if (game.winner != null) {
         WinnerDialog(
             game = game,
@@ -195,145 +276,167 @@ fun DartsGameScreen() {
     Scaffold(
         topBar = { TopAppBar(title = { Text("DartScorer") }) }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    syncSetupFromGame()
-                    showNewGameDialog = true
-                }) { Text("New Game") }
-
-                OutlinedButton(onClick = {
-                    if (game.isLegInProgress) {
-                        showRestartDialog = true
-                    } else {
-                        game.restartLeg()
-                        selectedMultiplier = DartMultiplier.SINGLE
-                        renderTick++
-                    }
-                }) { Text("Restart Leg") }
-
-                OutlinedButton(
-                    onClick = {
-                        game.undoLastThrow()
-                        renderTick++
-                    },
-                    enabled = game.canUndo
-                ) {
-                    Icon(
-                        painter = painterResource(id = android.R.drawable.ic_menu_revert),
-                        contentDescription = "Undo"
-                    )
-                }
-            }
-
-            key(renderTick) {
-                Scoreboard(game = game, version = renderTick)
-                Divider()
-
-                Text("Active: ${game.activePlayer.name}", fontWeight = FontWeight.Medium)
-
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val throwsInTurn = game.currentTurn.darts
-                    if (throwsInTurn.isEmpty()) {
-                        ChipText("No throws")
-                    } else {
-                        throwsInTurn.forEach { ChipText(it.displayText) }
-                    }
-                }
-
-                ChipText(
-                    text = game.bestPossibleFinishLine,
-                    emphasized = game.hasBestPossibleFinish
-                )
-
-                game.statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                DartMultiplier.entries.forEach { multiplier ->
-                    FilterChip(
-                        selected = selectedMultiplier == multiplier,
-                        onClick = { selectedMultiplier = multiplier },
-                        label = { Text(multiplier.label) }
-                    )
-                }
-            }
-
-            val throwButtons = (1..20).map { it.toString() } + listOf(
-                if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
-                "0",
-                "",
-                "",
-                "NO_SCORE"
-            )
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(5),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.heightIn(max = 280.dp)
+        key(renderTick) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 12.dp)
             ) {
-                items(throwButtons) { label ->
-                    if (label.isEmpty()) {
-                        Spacer(modifier = Modifier.fillMaxWidth().height(1.dp))
-                        return@items
-                    }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(onClick = {
+                            syncSetupFromGame()
+                            showNewGameDialog = true
+                        }) { Text("New Game") }
 
-                    val enabled = when (label) {
-                        "25", "Bull" -> game.winner == null && selectedMultiplier != DartMultiplier.TRIPLE
-                        else -> game.winner == null
-                    }
-
-                    Button(
-                        onClick = {
-                            when (label) {
-                                "25", "Bull" -> game.submitThrow(DartSegment.Bull, selectedMultiplier)
-                                "0" -> game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
-                                "NO_SCORE" -> {
-                                    val used = game.currentTurn.darts.size
-                                    repeat(used) {
-                                        game.undoLastThrow()
-                                    }
-                                    repeat(3) {
-                                        game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
-                                    }
-                                }
-                                else -> game.submitThrow(DartSegment.Number(label.toInt()), selectedMultiplier)
+                        OutlinedButton(onClick = {
+                            if (game.isLegInProgress) {
+                                showRestartDialog = true
+                            } else {
+                                game.restartLeg()
+                                selectedMultiplier = DartMultiplier.SINGLE
+                                renderTick++
                             }
-                            selectedMultiplier = DartMultiplier.SINGLE
+                        }) { Text("Restart Leg") }
+                    }
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_menu_preferences),
+                            contentDescription = "Settings",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            game.undoLastThrow()
                             renderTick++
                         },
-                        enabled = enabled,
-                        modifier = if (label == "NO_SCORE") {
-                            Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                        } else {
-                            Modifier.fillMaxWidth()
-                        },
-                        contentPadding = if (label == "NO_SCORE") {
-                            PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                        } else {
-                            ButtonDefaults.ContentPadding
-                        }
+                        enabled = game.canUndo,
+                        modifier = Modifier.size(48.dp)
                     ) {
-                        if (label == "NO_SCORE") {
-                            Text(
-                                "No\nScore",
-                                maxLines = 2,
-                                softWrap = true,
-                                overflow = TextOverflow.Clip,
-                                fontSize = 11.sp,
-                                lineHeight = 12.sp
-                            )
-                        } else {
-                            Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                        Icon(
+                            painter = painterResource(id = android.R.drawable.ic_media_previous),
+                            contentDescription = "Reverse",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                game.statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+
+                Scoreboard(
+                    game = game,
+                    version = renderTick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                ChipText(
+                    text = "Best Finish: ${game.bestPossibleFinishLine}",
+                    emphasized = game.hasBestPossibleFinish
+                )
+                Divider()
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DartMultiplier.entries.forEach { multiplier ->
+                        FilterChip(
+                            selected = selectedMultiplier == multiplier,
+                            onClick = { selectedMultiplier = multiplier },
+                            label = { Text(multiplier.label) }
+                        )
+                    }
+                }
+
+                val throwButtons = (1..20).map { it.toString() } + listOf(
+                    if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
+                    "0",
+                    "",
+                    "",
+                    "NO_SCORE"
+                )
+
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(5),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.heightIn(max = 252.dp)
+                ) {
+                        items(throwButtons) { label ->
+                            if (label.isEmpty()) {
+                                Spacer(modifier = Modifier.fillMaxWidth().height(1.dp))
+                                return@items
+                            }
+
+                            val enabled = when (label) {
+                                "25", "Bull" -> game.winner == null && selectedMultiplier != DartMultiplier.TRIPLE
+                                else -> game.winner == null
+                            }
+
+                            Button(
+                                onClick = {
+                                    when (label) {
+                                        "25", "Bull" -> game.submitThrow(DartSegment.Bull, selectedMultiplier)
+                                        "0" -> game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
+                                        "NO_SCORE" -> {
+                                            val used = game.currentTurn.darts.size
+                                            repeat(used) {
+                                                game.undoLastThrow()
+                                            }
+                                            repeat(3) {
+                                                game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
+                                            }
+                                        }
+                                        else -> game.submitThrow(DartSegment.Number(label.toInt()), selectedMultiplier)
+                                    }
+                                    selectedMultiplier = DartMultiplier.SINGLE
+                                    renderTick++
+                                },
+                                enabled = enabled,
+                                modifier = if (label == "NO_SCORE") {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp)
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                },
+                                contentPadding = if (label == "NO_SCORE") {
+                                    PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                                } else {
+                                    ButtonDefaults.ContentPadding
+                                }
+                            ) {
+                                if (label == "NO_SCORE") {
+                                    Text(
+                                        "No\nScore",
+                                        maxLines = 2,
+                                        softWrap = true,
+                                        overflow = TextOverflow.Clip,
+                                        fontSize = 11.sp,
+                                        lineHeight = 12.sp
+                                    )
+                                } else {
+                                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                                }
+                            }
                         }
                     }
                 }
@@ -344,14 +447,13 @@ fun DartsGameScreen() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Scoreboard(game: DartsGame, version: Int) {
+private fun Scoreboard(game: DartsGame, version: Int, modifier: Modifier = Modifier) {
     version
-    LazyColumn(
+    Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier
     ) {
-        items(game.players.size) { index ->
-            val player = game.players[index]
+        game.players.forEachIndexed { index, player ->
             val active = index == game.activePlayerIndex
             val throwsForBadge = if (active) {
                 game.currentTurn.darts.map { it.points }
@@ -370,7 +472,7 @@ private fun Scoreboard(game: DartsGame, version: Int) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(10.dp),
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -390,12 +492,26 @@ private fun Scoreboard(game: DartsGame, version: Int) {
                                 )
                             }
                             if (throwsForBadge.isNotEmpty()) {
-                                FlowRow(
+                                Row(
                                     modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     throwsForBadge.forEach { value ->
                                         ChipText(value.toString())
+                                    }
+                                    if (throwsForBadge.count() == 3) {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 2.dp)
+                                                .width(1.dp)
+                                                .height(16.dp)
+                                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
+                                        )
+                                        ChipText(
+                                            text = "${throwsForBadge.sum()}",
+                                            emphasized = true
+                                        )
                                     }
                                 }
                             }
@@ -406,7 +522,7 @@ private fun Scoreboard(game: DartsGame, version: Int) {
                         val average = game.legAverage(player) ?: 0.0
                         Text(
                             text = "⌀ ${"%.1f".format(average)}",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -417,16 +533,71 @@ private fun Scoreboard(game: DartsGame, version: Int) {
 }
 
 @Composable
-private fun ChipText(text: String, emphasized: Boolean = false) {
+private fun ChipText(text: String, emphasized: Boolean = false, modifier: Modifier = Modifier) {
     val background = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val foreground = if (emphasized) Color.White else MaterialTheme.colorScheme.onSurface
     Text(
         text = text,
         color = foreground,
         fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Normal,
-        modifier = Modifier
+        modifier = modifier
             .background(background, RoundedCornerShape(6.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp)
+    )
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun SettingsDialog(
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit,
+    selectedColorTheme: AppColorTheme,
+    onColorThemeChange: (AppColorTheme) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pendingDarkTheme by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
+    var pendingColorTheme by remember(selectedColorTheme) { mutableStateOf(selectedColorTheme) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = !pendingDarkTheme,
+                        onClick = { pendingDarkTheme = false },
+                        label = { Text("Light") }
+                    )
+                    FilterChip(
+                        selected = pendingDarkTheme,
+                        onClick = { pendingDarkTheme = true },
+                        label = { Text("Dark") }
+                    )
+                }
+                Text("Color Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppColorTheme.entries.forEach { appTheme ->
+                        FilterChip(
+                            selected = pendingColorTheme == appTheme,
+                            onClick = { pendingColorTheme = appTheme },
+                            label = { Text(appTheme.label) }
+                        )
+                    }
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onThemeChange(pendingDarkTheme)
+                    onColorThemeChange(pendingColorTheme)
+                    onDismiss()
+                }
+            ) { Text("Save") }
+        }
     )
 }
 
@@ -469,6 +640,7 @@ private fun WinnerDialog(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun NewGameDialog(
     setupPlayers: MutableList<SetupPlayer>,
     finishRule: FinishRule,
@@ -499,71 +671,62 @@ private fun NewGameDialog(
         onDismissRequest = {},
         title = { Text("New Game") },
         text = {
-            LazyColumn(
+            Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Players: ${setupPlayers.size}")
-                        OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
-                        OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size + 1) }) { Text("+") }
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Players: ${setupPlayers.size}")
+                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
+                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size + 1) }) { Text("+") }
                 }
-                item {
-                    Text("Game")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StartScoreOption.entries.forEach { option ->
-                            FilterChip(
-                                selected = startScore == option,
-                                onClick = { onStartScoreChange(option) },
-                                label = { Text(option.label) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    Text("Finish Mode")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FinishRule.entries.forEach { rule ->
-                            FilterChip(
-                                selected = finishRule == rule,
-                                onClick = { onFinishRuleChange(rule) },
-                                label = { Text(rule.label) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    Text("In Mode")
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        InRule.entries.forEach { rule ->
-                            FilterChip(
-                                selected = inRule == rule,
-                                onClick = { onInRuleChange(rule) },
-                                label = { Text(rule.label) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Game")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StartScoreOption.entries.forEach { option ->
                         FilterChip(
-                            selected = setModeEnabled,
-                            onClick = { onSetModeChange(!setModeEnabled) },
-                            label = { Text("Set Mode") }
+                            selected = startScore == option,
+                            onClick = { onStartScoreChange(option) },
+                            label = { Text(option.label) }
                         )
-                        if (setModeEnabled) {
-                            Text("Legs: $legsToWin")
-                            OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
-                            OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
-                        }
                     }
                 }
-                item { Text("Player Order") }
-                items(setupPlayers.size) { index ->
+                Text("Finish Mode")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FinishRule.entries.forEach { rule ->
+                        FilterChip(
+                            selected = finishRule == rule,
+                            onClick = { onFinishRuleChange(rule) },
+                            label = { Text(rule.label) }
+                        )
+                    }
+                }
+                Text("In Mode")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InRule.entries.forEach { rule ->
+                        FilterChip(
+                            selected = inRule == rule,
+                            onClick = { onInRuleChange(rule) },
+                            label = { Text(rule.label) }
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(
+                        selected = setModeEnabled,
+                        onClick = { onSetModeChange(!setModeEnabled) },
+                        label = { Text("Set Mode") }
+                    )
+                    if (setModeEnabled) {
+                        Text("Legs: $legsToWin")
+                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
+                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
+                    }
+                }
+                Text("Player Order")
+                repeat(setupPlayers.size) { index ->
                     val player = setupPlayers[index]
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -632,3 +795,12 @@ private fun NewGameDialog(
         confirmButton = { TextButton(onClick = onStart) { Text("Start") } }
     )
 }
+
+private const val APP_PREFS = "dartscorer_android_prefs"
+private const val KEY_SETUP_PLAYER_NAMES = "setup_player_names"
+private const val KEY_SETUP_FINISH_RULE = "setup_finish_rule"
+private const val KEY_SETUP_IN_RULE = "setup_in_rule"
+private const val KEY_SETUP_START_SCORE = "setup_start_score"
+private const val KEY_SETUP_SET_MODE = "setup_set_mode_enabled"
+private const val KEY_SETUP_LEGS_TO_WIN = "setup_legs_to_win"
+private const val NAME_DELIMITER = "\u001F"

@@ -10,6 +10,8 @@ class DartsGame(
     setModeEnabled: Boolean = false,
     legsToWin: Int = 3
 ) {
+    private val bestFinishEngine = DartsBestFinishEngine()
+
     var players: List<Player> = emptyList()
         private set
     var activePlayerIndex: Int = 0
@@ -46,7 +48,7 @@ class DartsGame(
     private val history = mutableListOf<GameSnapshot>()
 
     init {
-        val clampedCount = playerCount.coerceIn(1, 4)
+        val clampedCount = playerCount.coerceIn(1, 5)
         players = (1..clampedCount).map { Player(id = it, name = "Player $it", score = startingScore) }
         currentTurn = Turn(startingScore = startingScore, openedAtTurnStart = inRule == InRule.DEFAULT)
         resetSetState()
@@ -69,12 +71,23 @@ class DartsGame(
             val score = activePlayer.score
             val darts = remainingDarts
             if (darts <= 0) return "No finish available"
-            val route = bestFinishRoute(score, darts) ?: return "No finish available"
-            return route.joinToString(" ") { throwNotation(it) }
+            val suggestion = bestFinishEngine.getBestFinish(score = score, dartsRemaining = darts)
+            if (suggestion.darts.isEmpty()) return "No finish available"
+            return suggestion.darts.joinToString(" ") { bestFinishNotation(it) }
         }
 
     val hasBestPossibleFinish: Boolean
         get() = bestPossibleFinishLine != "No finish available"
+
+    private fun bestFinishNotation(target: DartTarget): String {
+        return when {
+            target.isBull -> "Bull"
+            target.isOuterBull -> "25"
+            target.multiplier == 1 -> "${target.value}"
+            target.multiplier == 2 -> "D${target.value}"
+            else -> "T${target.value}"
+        }
+    }
 
     val isLegInProgress: Boolean
         get() = winner == null && dartsThrownByPlayerId.values.any { it > 0 }
@@ -351,7 +364,7 @@ class DartsGame(
     }
 
     private fun sanitizeAndClampNames(names: List<String>): List<String> {
-        val clamped = names.take(4)
+        val clamped = names.take(5)
         val withFallbacks = clamped.mapIndexed { index, name ->
             val trimmed = name.trim()
             if (trimmed.isEmpty()) "Player ${index + 1}" else trimmed
