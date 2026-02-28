@@ -18,54 +18,14 @@ struct DartsGameView: View {
     var body: some View {
         ZStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 12) {
-                    controlBar
+                controlBar
+                    .padding(.horizontal)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
-                            HStack {
-                                Text(player.name)
-                                if game.setModeEnabled {
-                                    Text("\(game.legsWon(for: player))")
-                                        .font(.footnote)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.accentColor)
-                                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                                }
-                                let throwsForBadge = throwsToDisplay(for: player, at: index)
-                                if !throwsForBadge.isEmpty {
-                                    HStack(spacing: 4) {
-                                        ForEach(Array(throwsForBadge.enumerated()), id: \.offset) { _, value in
-                                            Text("\(value)")
-                                                .font(.footnote)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color(.tertiarySystemBackground))
-                                                .clipShape(RoundedRectangle(cornerRadius: 5))
-                                        }
-                                    }
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("\(player.score)")
-                                        .fontWeight(.semibold)
-                                    Text("⌀ \(String(format: "%.1f", game.legAverage(for: player) ?? 0.0))")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(10)
-                            .background(index == game.activePlayerIndex ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                }
-                .padding(.horizontal)
+                scoreboardSection
+                    .padding(.horizontal)
 
                 Divider()
+                    .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 16) {
                     Group {
@@ -90,10 +50,17 @@ struct DartsGameView: View {
                     }
 
                     multiplierPicker
-                    numberPad
                 }
                 .padding(.horizontal)
-                .padding(.bottom)
+
+                Spacer(minLength: 0)
+
+                Divider()
+                    .padding(.horizontal)
+
+                numberPad
+                    .padding(.horizontal)
+                    .padding(.bottom)
             }
 
             if let winner = game.winner {
@@ -135,6 +102,59 @@ struct DartsGameView: View {
             }
         } message: {
             Text("You already started this leg. This will discard current progress.")
+        }
+    }
+
+    private var scoreboardSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
+                HStack {
+                    Text(player.name)
+                    if game.setModeEnabled {
+                        Text("\(game.legsWon(for: player))")
+                            .font(.footnote)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                    }
+                    let throwsForBadge = throwsToDisplay(for: player, at: index)
+                    if !throwsForBadge.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(Array(throwsForBadge.enumerated()), id: \.offset) { _, value in
+                                Text("\(value)")
+                                    .font(.footnote)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(.tertiarySystemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                            }
+                            if throwsForBadge.count == 3 {
+                                Text("\(throwsForBadge.reduce(0, +))")
+                                    .font(.footnote)
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(.tertiarySystemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                            }
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(player.score)")
+                            .fontWeight(.semibold)
+                        Text("⌀ \(String(format: "%.1f", game.legAverage(for: player) ?? 0.0))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(10)
+                .background(index == game.activePlayerIndex ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
     }
 
@@ -233,6 +253,12 @@ struct DartsGameView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
+                    Button("Back") {
+                        game.undoLastThrow()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!game.canUndo)
+
                     if game.setWinner == nil {
                         Button("New Leg (Random)") {
                             game.restartLegRandomSequence()
