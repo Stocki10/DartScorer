@@ -127,6 +127,10 @@ struct DartsGameView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
                             }
                             if throwsForBadge.count == 3 {
+                                Rectangle()
+                                    .fill(Color.secondary.opacity(0.35))
+                                    .frame(width: 1, height: 16)
+                                    .padding(.horizontal, 2)
                                 Text("\(throwsForBadge.reduce(0, +))")
                                     .font(.footnote)
                                     .fontWeight(.semibold)
