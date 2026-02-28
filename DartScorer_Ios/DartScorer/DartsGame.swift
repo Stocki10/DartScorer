@@ -52,7 +52,7 @@ final class DartsGame: ObservableObject {
         setModeEnabled: Bool = false,
         legsToWin: Int = 3
     ) {
-        let clampedCount = min(max(1, playerCount), 4)
+        let clampedCount = min(max(1, playerCount), 5)
         self.startingScore = startingScore
         self.finishRule = finishRule
         self.inRule = inRule
@@ -217,7 +217,7 @@ final class DartsGame: ObservableObject {
     }
 
     func newGame(playerCount: Int) {
-        let clampedCount = min(max(1, playerCount), 4)
+        let clampedCount = min(max(1, playerCount), 5)
         let names = (1...clampedCount).map { index in
             players.indices.contains(index - 1) ? players[index - 1].name : "Player \(index)"
         }
@@ -457,7 +457,7 @@ private struct GameSnapshot {
 
 private extension DartsGame {
     func sanitizeAndClampNames(_ names: [String]) -> [String] {
-        let clamped = Array(names.prefix(4))
+        let clamped = Array(names.prefix(5))
         let withFallbacks = clamped.enumerated().map { index, name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? "Player \(index + 1)" : trimmed

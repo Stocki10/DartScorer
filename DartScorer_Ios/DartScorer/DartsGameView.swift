@@ -344,7 +344,7 @@ private struct NewGameSetupView: View {
         NavigationStack {
             Form {
                 Section("Game Settings") {
-                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 1...4)
+                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 1...5)
 
                     Picker("Game", selection: $startScore) {
                         ForEach(StartScoreOption.allCases) { option in
@@ -417,7 +417,7 @@ private struct NewGameSetupView: View {
         Binding(
             get: { setupPlayers.count },
             set: { newValue in
-                let clamped = min(max(1, newValue), 4)
+                let clamped = min(max(1, newValue), 5)
                 if clamped > setupPlayers.count {
                     let start = setupPlayers.count + 1
                     for index in start...clamped {
