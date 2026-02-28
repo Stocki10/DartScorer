@@ -1,0 +1,25 @@
+# macOS system files
+.DS_Store
+
+# IDE & Editor files
+.idea/
+*.swp
+*.swo
+
+# Xcode / Swift build artifacts
+DerivedData/
+*.xcresult
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+.build/
+
+# Android / Gradle build artifacts
+/build/
+*/build/
+.gradle/
+local.properties
+captures/
+
+# Logs
+*.log
