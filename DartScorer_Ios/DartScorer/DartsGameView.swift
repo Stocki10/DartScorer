@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DartsGameView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
@@ -324,8 +325,21 @@ struct DartsGameView: View {
     }
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
+        let previousScore = game.activePlayer.score
         game.submitThrow(segment: segment, multiplier: multiplier)
         selectedMultiplier = .single
+        
+        if let status = game.statusMessage {
+            if status.contains("wins") {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } else if previousScore < game.activePlayer.score && game.activePlayer.score > 0 {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            }
+        } else if game.activePlayer.score == 0 {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
     }
 
     private func submitNoScoreTurn() {
