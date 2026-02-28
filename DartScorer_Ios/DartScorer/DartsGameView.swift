@@ -29,15 +29,6 @@ struct DartsGameView: View {
 
                 VStack(alignment: .leading, spacing: 16) {
 
-                    Text(game.bestPossibleFinishLine)
-                        .font(.subheadline)
-                        .fontWeight(game.hasBestPossibleFinish ? .bold : .regular)
-                        .foregroundStyle(game.hasBestPossibleFinish ? Color.white : Color.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(game.hasBestPossibleFinish ? Color.accentColor : Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-
                     if let statusMessage = game.statusMessage {
                         Text(statusMessage)
                             .foregroundStyle(.secondary)
@@ -46,6 +37,16 @@ struct DartsGameView: View {
                 .padding(.horizontal)
 
                 Spacer(minLength: 0)
+
+                Text(game.bestPossibleFinishLine)
+                    .font(.subheadline)
+                    .fontWeight(game.hasBestPossibleFinish ? .bold : .regular)
+                    .foregroundStyle(game.hasBestPossibleFinish ? Color.white : Color.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(game.hasBestPossibleFinish ? Color.accentColor : Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(.horizontal)
 
                 Divider()
                     .padding(.horizontal)
