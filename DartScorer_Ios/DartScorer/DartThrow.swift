@@ -1,6 +1,6 @@
 import Foundation
 
-enum DartMultiplier: Int, CaseIterable, Identifiable {
+enum DartMultiplier: Int, CaseIterable, Identifiable, Codable {
     case single = 1
     case double = 2
     case triple = 3
