@@ -140,6 +140,8 @@ struct DartsGameView: View {
                             ForEach(Array(throwsForBadge.enumerated()), id: \.offset) { _, value in
                                 Text("\(value)")
                                     .font(.footnote)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Color(.tertiarySystemBackground))
@@ -153,6 +155,9 @@ struct DartsGameView: View {
                                 Text("\(throwsForBadge.reduce(0, +))")
                                     .font(.footnote)
                                     .fontWeight(.semibold)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                    .layoutPriority(1)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Color(.tertiarySystemBackground))
@@ -406,7 +411,7 @@ private struct NewGameSetupView: View {
         NavigationStack {
             Form {
                 Section("Game Settings") {
-                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 1...5)
+                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 2...5)
 
                     Picker("Game", selection: $startScore) {
                         ForEach(StartScoreOption.allCases) { option in
@@ -479,7 +484,7 @@ private struct NewGameSetupView: View {
         Binding(
             get: { setupPlayers.count },
             set: { newValue in
-                let clamped = min(max(1, newValue), 5)
+                let clamped = min(max(2, newValue), 5)
                 if clamped > setupPlayers.count {
                     let start = setupPlayers.count + 1
                     for index in start...clamped {

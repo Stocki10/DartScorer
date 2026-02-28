@@ -89,13 +89,17 @@ fun DartsGameScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(APP_PREFS, MODE_PRIVATE) }
     val initialNames = remember {
-        val raw = prefs.getString(KEY_SETUP_PLAYER_NAMES, null)
-        raw?.split(NAME_DELIMITER)
+        val parsed = prefs.getString(KEY_SETUP_PLAYER_NAMES, null)
+            ?.split(NAME_DELIMITER)
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
             ?.take(5)
             .orEmpty()
-            .ifEmpty { listOf("Player 1", "Player 2") }
+        when {
+            parsed.isEmpty() -> listOf("Player 1", "Player 2")
+            parsed.size == 1 -> parsed + "Player 2"
+            else -> parsed
+        }
     }
     val initialFinishRule = remember {
         prefs.getString(KEY_SETUP_FINISH_RULE, FinishRule.DOUBLE_OUT.name)
@@ -190,7 +194,7 @@ fun DartsGameScreen(
             legsToWin = setupLegsToWin,
             onLegsToWinChange = { setupLegsToWin = max(1, it) },
             onPlayerCountChange = { count ->
-                val clamped = count.coerceIn(1, 5)
+                val clamped = count.coerceIn(2, 5)
                 if (clamped > setupPlayers.size) {
                     val start = setupPlayers.size + 1
                     for (index in start..clamped) {
@@ -348,8 +352,6 @@ fun DartsGameScreen(
                         .padding(top = 4.dp)
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
-
                 ChipText(
                     text = "Best Finish: ${game.bestPossibleFinishLine}",
                     emphasized = game.hasBestPossibleFinish
@@ -378,7 +380,7 @@ fun DartsGameScreen(
                     columns = GridCells.Fixed(5),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.heightIn(max = 252.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                         items(throwButtons) { label ->
                             if (label.isEmpty()) {

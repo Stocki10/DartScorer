@@ -48,7 +48,7 @@ class DartsGame(
     private val history = mutableListOf<GameSnapshot>()
 
     init {
-        val clampedCount = playerCount.coerceIn(1, 5)
+        val clampedCount = playerCount.coerceIn(2, 5)
         players = (1..clampedCount).map { Player(id = it, name = "Player $it", score = startingScore) }
         currentTurn = Turn(startingScore = startingScore, openedAtTurnStart = inRule == InRule.DEFAULT)
         resetSetState()
@@ -369,7 +369,11 @@ class DartsGame(
             val trimmed = name.trim()
             if (trimmed.isEmpty()) "Player ${index + 1}" else trimmed
         }
-        return if (withFallbacks.isEmpty()) listOf("Player 1") else withFallbacks
+        return when {
+            withFallbacks.isEmpty() -> listOf("Player 1", "Player 2")
+            withFallbacks.size == 1 -> withFallbacks + "Player 2"
+            else -> withFallbacks
+        }
     }
 
     private fun recordSnapshot() {
