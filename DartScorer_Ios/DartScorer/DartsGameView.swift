@@ -14,6 +14,7 @@ struct DartsGameView: View {
     @State private var isShowingRestartAlert = false
     @State private var hasPresentedInitialSetup = false
     @State private var isShowingThemeSettings = false
+    @State private var draftThemeMode: AppThemeMode = .light
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -87,6 +88,14 @@ struct DartsGameView: View {
                     isShowingNewGameSetup = false
                 }
             )
+        }
+        .fullScreenCover(isPresented: $isShowingThemeSettings) {
+            SettingsPopupView(
+                themeMode: $draftThemeMode
+            ) {
+                applySettings()
+            }
+            .presentationBackground(.clear)
         }
         .onAppear {
             guard !hasPresentedInitialSetup else { return }
@@ -179,25 +188,12 @@ struct DartsGameView: View {
             Spacer(minLength: 0)
 
             Button {
+                draftThemeMode = AppThemeMode(rawValue: appThemeModeRaw) ?? .light
                 isShowingThemeSettings = true
             } label: {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.bordered)
-            .popover(isPresented: $isShowingThemeSettings, arrowEdge: .top) {
-                NavigationStack {
-                    Form {
-                        Section("Appearance") {
-                            Toggle(isOn: darkModeBinding) {
-                                Label("Theme", systemImage: "moon.fill")
-                            }
-                        }
-                    }
-                    .navigationTitle("Settings")
-                    .navigationBarTitleDisplayMode(.inline)
-                }
-                .frame(width: 320, height: 220)
-            }
 
             Button {
                 game.undoLastThrow()
@@ -207,15 +203,6 @@ struct DartsGameView: View {
             .buttonStyle(.bordered)
             .disabled(!game.canUndo)
         }
-    }
-
-    private var darkModeBinding: Binding<Bool> {
-        Binding(
-            get: { appThemeModeRaw == AppThemeMode.dark.rawValue },
-            set: { isDark in
-                appThemeModeRaw = isDark ? AppThemeMode.dark.rawValue : AppThemeMode.light.rawValue
-            }
-        )
     }
 
     private var multiplierPicker: some View {
@@ -357,6 +344,10 @@ struct DartsGameView: View {
             return game.currentTurn.darts.map(\.points)
         }
         return game.lastTurnThrows(for: player)
+    }
+
+    private func applySettings() {
+        appThemeModeRaw = draftThemeMode.rawValue
     }
 
 }
