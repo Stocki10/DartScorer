@@ -53,6 +53,11 @@ final class BestFinishEngineTests: XCTestCase {
         XCTAssertEqual(engine.routeTokens(route), ["S11", "D20"])
     }
 
+    func test50ReturnsBull() {
+        let route = engine.getBestFinish(for: 50, dartsRemaining: 3)
+        XCTAssertEqual(engine.routeTokens(route), ["Bull"])
+    }
+
     func testSuggestedCheckoutRoutesEndOnDoubleOrBull() {
         let sampleScores = [2, 32, 40, 44, 52, 61, 70, 82, 85, 90, 101, 132, 170]
         for score in sampleScores {

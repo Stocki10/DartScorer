@@ -4,18 +4,15 @@ import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
 enum class AppColorTheme(val label: String) {
-    MATERIAL_YOU("Material You"),
-    TONAL_SPOT("Tonal Spot"),
-    NEUTRAL("Neutral"),
-    VIBRANT("Vibrant")
+    PURPLE("Purple"),
+    BLUE("Blue"),
+    GREEN("Green"),
+    ORANGE("Orange")
 }
 
 enum class AppThemeMode(val label: String) {
@@ -24,76 +21,86 @@ enum class AppThemeMode(val label: String) {
     DARK("Dark")
 }
 
-private val TonalSpotDarkColorScheme = darkColorScheme(
+private val PurpleDarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val TonalSpotLightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-)
-
-private val NeutralDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFCAC4D0),
-    secondary = Color(0xFFCCC2DC),
-    tertiary = Color(0xFFEFB8C8),
+    tertiary = Pink80,
     background = Color(0xFF141218),
     surface = Color(0xFF141218)
 )
 
-private val NeutralLightColorScheme = lightColorScheme(
-    primary = Color(0xFF625B71),
-    secondary = Color(0xFF625B71),
-    tertiary = Color(0xFF7D5260),
+private val PurpleLightColorScheme = lightColorScheme(
+    primary = Purple40,
+    secondary = PurpleGrey40,
+    tertiary = Pink40,
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE)
 )
 
-private val VibrantDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFB4A8),
-    secondary = Color(0xFFE7BDB6),
-    tertiary = Color(0xFFD0C58A),
-    background = Color(0xFF201A19),
-    surface = Color(0xFF201A19)
+private val BlueDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF9FC9FF),
+    secondary = Color(0xFFB8C3DC),
+    tertiary = Color(0xFFA9C8E8),
+    background = Color(0xFF141218),
+    surface = Color(0xFF141218)
 )
 
-private val VibrantLightColorScheme = lightColorScheme(
-    primary = Color(0xFFBA1A1A),
-    secondary = Color(0xFF775651),
-    tertiary = Color(0xFF6F5D2F),
-    background = Color(0xFFFFF8F6),
-    surface = Color(0xFFFFF8F6)
+private val BlueLightColorScheme = lightColorScheme(
+    primary = Color(0xFF1E5AA8),
+    secondary = Color(0xFF4B5F83),
+    tertiary = Color(0xFF2E6986),
+    background = Color(0xFFFFFBFE),
+    surface = Color(0xFFFFFBFE)
+)
+
+private val GreenDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF9ED7AE),
+    secondary = Color(0xFFB8CCB0),
+    tertiary = Color(0xFFA5D4C8),
+    background = Color(0xFF111411),
+    surface = Color(0xFF111411)
+)
+
+private val GreenLightColorScheme = lightColorScheme(
+    primary = Color(0xFF2D6A3A),
+    secondary = Color(0xFF4F6350),
+    tertiary = Color(0xFF3B6C62),
+    background = Color(0xFFF7FCF5),
+    surface = Color(0xFFF7FCF5)
+)
+
+private val OrangeDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFFC08A),
+    secondary = Color(0xFFE5C2A9),
+    tertiary = Color(0xFFFFD58A),
+    background = Color(0xFF17120F),
+    surface = Color(0xFF17120F)
+)
+
+private val OrangeLightColorScheme = lightColorScheme(
+    primary = Color(0xFFA24D12),
+    secondary = Color(0xFF7A5A43),
+    tertiary = Color(0xFF8A6100),
+    background = Color(0xFFFFF8F4),
+    surface = Color(0xFFFFF8F4)
 )
 
 @Composable
 fun DartScorer_AndroidTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     colorTheme: AppColorTheme = AppColorTheme.PURPLE,
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-    val supportsDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colorScheme = when (colorTheme) {
-        AppColorTheme.MATERIAL_YOU ->
-            if (supportsDynamic) {
-                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-            } else {
-                if (darkTheme) TonalSpotDarkColorScheme else TonalSpotLightColorScheme
-            }
-
-        AppColorTheme.TONAL_SPOT ->
-            if (darkTheme) TonalSpotDarkColorScheme else TonalSpotLightColorScheme
-
-        AppColorTheme.NEUTRAL ->
-            if (darkTheme) NeutralDarkColorScheme else NeutralLightColorScheme
-
-        AppColorTheme.VIBRANT ->
-            if (darkTheme) VibrantDarkColorScheme else VibrantLightColorScheme
+        AppColorTheme.PURPLE ->
+            if (darkTheme) PurpleDarkColorScheme else PurpleLightColorScheme
+        AppColorTheme.BLUE ->
+            if (darkTheme) BlueDarkColorScheme else BlueLightColorScheme
+        AppColorTheme.GREEN ->
+            if (darkTheme) GreenDarkColorScheme else GreenLightColorScheme
+        AppColorTheme.ORANGE ->
+            if (darkTheme) OrangeDarkColorScheme else OrangeLightColorScheme
     }
 
     MaterialTheme(

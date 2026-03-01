@@ -33,9 +33,9 @@ class MainActivity : ComponentActivity() {
             }
             var appColorTheme by remember {
                 mutableStateOf(
-                    prefs.getString(KEY_COLOR_THEME, AppColorTheme.MATERIAL_YOU.name)
-                        ?.let { runCatching { AppColorTheme.valueOf(it) }.getOrDefault(AppColorTheme.MATERIAL_YOU) }
-                        ?: AppColorTheme.MATERIAL_YOU
+                    prefs.getString(KEY_COLOR_THEME, AppColorTheme.PURPLE.name)
+                        ?.let { runCatching { AppColorTheme.valueOf(it) }.getOrDefault(AppColorTheme.PURPLE) }
+                        ?: AppColorTheme.PURPLE
                 )
             }
             val systemDark = isSystemInDarkTheme()

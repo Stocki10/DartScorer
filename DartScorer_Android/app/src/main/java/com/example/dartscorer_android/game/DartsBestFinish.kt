@@ -65,6 +65,7 @@ class DartsBestFinishEngine {
         60 to listOf("S20", "D20"),
         56 to listOf("S16", "D20"),
         52 to listOf("S12", "D20"),
+        50 to listOf("Bull"),
         48 to listOf("S16", "D16"),
         44 to listOf("S12", "D16"),
         40 to listOf("D20"),
