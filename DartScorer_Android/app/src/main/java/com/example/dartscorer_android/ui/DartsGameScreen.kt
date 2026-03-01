@@ -39,10 +39,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -70,6 +72,7 @@ import com.example.dartscorer_android.game.InRule
 import com.example.dartscorer_android.game.Player
 import com.example.dartscorer_android.game.StartScoreOption
 import com.example.dartscorer_android.ui.theme.AppColorTheme
+import com.example.dartscorer_android.ui.theme.AppThemeMode
 import kotlin.math.max
 
 private data class SetupPlayer(
@@ -78,11 +81,16 @@ private data class SetupPlayer(
     val defaultName: String
 )
 
+private data class WinnerOverlayState(
+    val winnerName: String,
+    val isSetWin: Boolean
+)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DartsGameScreen(
-    isDarkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit,
+    selectedThemeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
     selectedColorTheme: AppColorTheme,
     onColorThemeChange: (AppColorTheme) -> Unit
 ) {
@@ -142,6 +150,7 @@ fun DartsGameScreen(
     var showNewGameDialog by remember { mutableStateOf(true) }
     var showRestartDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var winnerOverlay by remember { mutableStateOf<WinnerOverlayState?>(null) }
     val setupPlayers = remember { mutableStateListOf<SetupPlayer>() }
     var setupFinishRule by remember { mutableStateOf(initialFinishRule) }
     var setupInRule by remember { mutableStateOf(initialInRule) }
@@ -174,6 +183,17 @@ fun DartsGameScreen(
             .putBoolean(KEY_SETUP_SET_MODE, setupSetModeEnabled)
             .putInt(KEY_SETUP_LEGS_TO_WIN, setupLegsToWin)
             .apply()
+    }
+
+    fun syncWinnerOverlayFromGame() {
+        if (winnerOverlay != null) return
+        val winnerName = game.winner?.name ?: game.players.firstOrNull { it.score == 0 }?.name
+        if (winnerName != null) {
+            winnerOverlay = WinnerOverlayState(
+                winnerName = winnerName,
+                isSetWin = game.setWinner != null
+            )
+        }
     }
 
     if (showNewGameDialog && setupPlayers.isEmpty()) {
@@ -223,6 +243,7 @@ fun DartsGameScreen(
                     setModeEnabled = setupSetModeEnabled,
                     legsToWin = setupLegsToWin
                 )
+                winnerOverlay = null
                 persistSetupToPrefs()
                 selectedMultiplier = DartMultiplier.SINGLE
                 showNewGameDialog = false
@@ -240,6 +261,7 @@ fun DartsGameScreen(
                 TextButton(
                     onClick = {
                         game.restartLeg()
+                        winnerOverlay = null
                         showRestartDialog = false
                         renderTick++
                     }
@@ -253,30 +275,18 @@ fun DartsGameScreen(
 
     if (showSettingsDialog) {
         SettingsDialog(
-            isDarkTheme = isDarkTheme,
-            onThemeChange = onThemeChange,
+            selectedThemeMode = selectedThemeMode,
+            onThemeModeChange = onThemeModeChange,
             selectedColorTheme = selectedColorTheme,
             onColorThemeChange = onColorThemeChange,
             onDismiss = { showSettingsDialog = false }
         )
     }
 
-    if (game.winner != null) {
-        WinnerDialog(
-            game = game,
-            onNewLegRandom = {
-                game.restartLegRandomSequence()
-                selectedMultiplier = DartMultiplier.SINGLE
-                renderTick++
-            },
-            onStartNewGame = {
-                syncSetupFromGame()
-                showNewGameDialog = true
-                renderTick++
-            }
-        )
+    val zeroScoreWinnerFallback = game.players.firstOrNull { it.score == 0 }
+    LaunchedEffect(game.winner?.id, zeroScoreWinnerFallback?.id, game.setWinner?.id) {
+        syncWinnerOverlayFromGame()
     }
-
     Scaffold(
         topBar = { TopAppBar(title = { Text("DartScorer") }) }
     ) { innerPadding ->
@@ -285,103 +295,115 @@ fun DartsGameScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 12.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .navigationBarsPadding(),
+                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedButton(onClick = {
-                            syncSetupFromGame()
-                            showNewGameDialog = true
-                        }) { Text("New Game") }
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(onClick = {
+                                syncSetupFromGame()
+                                showNewGameDialog = true
+                            }) { Text("New Game") }
 
-                        OutlinedButton(onClick = {
+                            OutlinedButton(onClick = {
                             if (game.isLegInProgress) {
                                 showRestartDialog = true
                             } else {
                                 game.restartLeg()
+                                winnerOverlay = null
                                 selectedMultiplier = DartMultiplier.SINGLE
                                 renderTick++
                             }
-                        }) { Text("Restart Leg") }
+                            }) { Text("Restart Leg") }
+                        }
+                        IconButton(
+                            onClick = { showSettingsDialog = true },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_menu_preferences),
+                                contentDescription = "Settings",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                game.undoLastThrow()
+                                renderTick++
+                            },
+                            enabled = game.canUndo,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_media_previous),
+                                contentDescription = "Reverse",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
-                    IconButton(
-                        onClick = { showSettingsDialog = true },
-                        modifier = Modifier.size(48.dp)
+
+                    if (winnerOverlay == null) {
+                        game.statusMessage
+                            ?.takeIf { !it.contains("wins", ignoreCase = true) && !it.contains("won", ignoreCase = true) }
+                            ?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+
+                    Scoreboard(
+                        game = game,
+                        version = renderTick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    val bestFinishText = if (game.hasBestPossibleFinish) {
+                        "Best Finish: ${game.bestPossibleFinishLine}"
+                    } else {
+                        "No finish available"
+                    }
+                    ChipText(
+                        text = bestFinishText,
+                        emphasized = game.hasBestPossibleFinish
+                    )
+                    Divider()
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DartMultiplier.entries.forEach { multiplier ->
+                            FilterChip(
+                                selected = selectedMultiplier == multiplier,
+                                onClick = { selectedMultiplier = multiplier },
+                                label = { Text(multiplier.label) }
+                            )
+                        }
+                    }
+
+                    val throwButtons = (1..20).map { it.toString() } + listOf(
+                        if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
+                        "0",
+                        "",
+                        "",
+                        "NO_SCORE"
+                    )
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(5),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_preferences),
-                            contentDescription = "Settings",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            game.undoLastThrow()
-                            renderTick++
-                        },
-                        enabled = game.canUndo,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_media_previous),
-                            contentDescription = "Reverse",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-
-                game.statusMessage?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-
-                Scoreboard(
-                    game = game,
-                    version = renderTick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp)
-                )
-
-                ChipText(
-                    text = "Best Finish: ${game.bestPossibleFinishLine}",
-                    emphasized = game.hasBestPossibleFinish
-                )
-                Divider()
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DartMultiplier.entries.forEach { multiplier ->
-                        FilterChip(
-                            selected = selectedMultiplier == multiplier,
-                            onClick = { selectedMultiplier = multiplier },
-                            label = { Text(multiplier.label) }
-                        )
-                    }
-                }
-
-                val throwButtons = (1..20).map { it.toString() } + listOf(
-                    if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
-                    "0",
-                    "",
-                    "",
-                    "NO_SCORE"
-                )
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
                         items(throwButtons) { label ->
                             if (label.isEmpty()) {
                                 Spacer(modifier = Modifier.fillMaxWidth().height(1.dp))
@@ -400,15 +422,12 @@ fun DartsGameScreen(
                                         "0" -> game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
                                         "NO_SCORE" -> {
                                             val used = game.currentTurn.darts.size
-                                            repeat(used) {
-                                                game.undoLastThrow()
-                                            }
-                                            repeat(3) {
-                                                game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
-                                            }
+                                            repeat(used) { game.undoLastThrow() }
+                                            repeat(3) { game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE) }
                                         }
                                         else -> game.submitThrow(DartSegment.Number(label.toInt()), selectedMultiplier)
                                     }
+                                    syncWinnerOverlayFromGame()
                                     selectedMultiplier = DartMultiplier.SINGLE
                                     renderTick++
                                 },
@@ -441,6 +460,30 @@ fun DartsGameScreen(
                             }
                         }
                     }
+                }
+
+                winnerOverlay?.let { overlay ->
+                    WinnerDialog(
+                        winnerName = overlay.winnerName,
+                        isSetWin = overlay.isSetWin,
+                        onUndoWin = {
+                            winnerOverlay = null
+                            game.undoLastThrow()
+                            renderTick++
+                        },
+                        onNewLegRandom = {
+                            winnerOverlay = null
+                            game.restartLegRandomSequence()
+                            selectedMultiplier = DartMultiplier.SINGLE
+                            renderTick++
+                        },
+                        onStartNewGame = {
+                            winnerOverlay = null
+                            syncSetupFromGame()
+                            showNewGameDialog = true
+                            renderTick++
+                        }
+                    )
                 }
             }
         }
@@ -551,13 +594,13 @@ private fun ChipText(text: String, emphasized: Boolean = false, modifier: Modifi
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun SettingsDialog(
-    isDarkTheme: Boolean,
-    onThemeChange: (Boolean) -> Unit,
+    selectedThemeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
     selectedColorTheme: AppColorTheme,
     onColorThemeChange: (AppColorTheme) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var pendingDarkTheme by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
+    var pendingThemeMode by remember(selectedThemeMode) { mutableStateOf(selectedThemeMode) }
     var pendingColorTheme by remember(selectedColorTheme) { mutableStateOf(selectedColorTheme) }
 
     AlertDialog(
@@ -568,13 +611,18 @@ private fun SettingsDialog(
                 Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
-                        selected = !pendingDarkTheme,
-                        onClick = { pendingDarkTheme = false },
+                        selected = pendingThemeMode == AppThemeMode.SYSTEM,
+                        onClick = { pendingThemeMode = AppThemeMode.SYSTEM },
+                        label = { Text(AppThemeMode.SYSTEM.label) }
+                    )
+                    FilterChip(
+                        selected = pendingThemeMode == AppThemeMode.LIGHT,
+                        onClick = { pendingThemeMode = AppThemeMode.LIGHT },
                         label = { Text("Light") }
                     )
                     FilterChip(
-                        selected = pendingDarkTheme,
-                        onClick = { pendingDarkTheme = true },
+                        selected = pendingThemeMode == AppThemeMode.DARK,
+                        onClick = { pendingThemeMode = AppThemeMode.DARK },
                         label = { Text("Dark") }
                     )
                 }
@@ -594,7 +642,7 @@ private fun SettingsDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onThemeChange(pendingDarkTheme)
+                    onThemeModeChange(pendingThemeMode)
                     onColorThemeChange(pendingColorTheme)
                     onDismiss()
                 }
@@ -605,40 +653,56 @@ private fun SettingsDialog(
 
 @Composable
 private fun WinnerDialog(
-    game: DartsGame,
+    winnerName: String,
+    isSetWin: Boolean,
+    onUndoWin: () -> Unit,
     onNewLegRandom: () -> Unit,
     onStartNewGame: () -> Unit
 ) {
-    val winner = game.winner ?: return
-    val title = if (game.setWinner == null) "Leg Won" else "Winner"
-    val subtitle = if (game.setWinner != null) {
-        "Match complete."
-    } else {
-        val outText = if (game.finishRule == FinishRule.DOUBLE_OUT) "double-out" else "single-out"
-        val inText = if (game.inRule == InRule.DOUBLE_IN) "double-in" else "default-in"
-        "Played $inText, $outText."
-    }
+    val title = if (isSetWin) "Set Won" else "Leg Won"
+    val subtitle = if (isSetWin) "Set finished. Choose next action." else "Leg finished. Choose next action."
 
-    AlertDialog(
-        onDismissRequest = {},
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(winner.name, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (game.setWinner == null) {
-                    TextButton(onClick = onNewLegRandom) { Text("New Leg (Random)") }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.45f))
+            .zIndex(20f),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(winnerName, fontWeight = FontWeight.SemiBold)
+                    Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = onStartNewGame) {
-                    Text(if (game.setWinner == null) "New Game" else "Start New Game")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onUndoWin) { Text("Back") }
+                    if (!isSetWin) {
+                        TextButton(onClick = onNewLegRandom) { Text("New Leg (Random)") }
+                    }
+                    TextButton(onClick = onStartNewGame) {
+                        Text(if (!isSetWin) "New Game" else "Start New Game")
+                    }
                 }
             }
         }
-    )
+    }
 }
 
 @Composable

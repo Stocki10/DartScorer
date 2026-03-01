@@ -1,6 +1,5 @@
 package com.example.dartscorer_android.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -13,58 +12,60 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 enum class AppColorTheme(val label: String) {
-    PURPLE("Purple"),
-    BLUE("Blue"),
-    GREEN("Green"),
-    ORANGE("Orange")
+    MATERIAL_YOU("Material You"),
+    TONAL_SPOT("Tonal Spot"),
+    NEUTRAL("Neutral"),
+    VIBRANT("Vibrant")
 }
 
-private val PurpleDarkColorScheme = darkColorScheme(
+enum class AppThemeMode(val label: String) {
+    SYSTEM("System"),
+    LIGHT("Light"),
+    DARK("Dark")
+}
+
+private val TonalSpotDarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
     tertiary = Pink80
 )
 
-private val PurpleLightColorScheme = lightColorScheme(
+private val TonalSpotLightColorScheme = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
     tertiary = Pink40
 )
 
-private val BlueDarkColorScheme = darkColorScheme(
-    primary = Color(0xFF9CCAFF),
-    secondary = Color(0xFFB5C4FF),
-    tertiary = Color(0xFF9ECBE1)
+private val NeutralDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFCAC4D0),
+    secondary = Color(0xFFCCC2DC),
+    tertiary = Color(0xFFEFB8C8),
+    background = Color(0xFF141218),
+    surface = Color(0xFF141218)
 )
 
-private val BlueLightColorScheme = lightColorScheme(
-    primary = Color(0xFF2E5FA8),
-    secondary = Color(0xFF4E5D92),
-    tertiary = Color(0xFF2D6F8A)
+private val NeutralLightColorScheme = lightColorScheme(
+    primary = Color(0xFF625B71),
+    secondary = Color(0xFF625B71),
+    tertiary = Color(0xFF7D5260),
+    background = Color(0xFFFFFBFE),
+    surface = Color(0xFFFFFBFE)
 )
 
-private val GreenDarkColorScheme = darkColorScheme(
-    primary = Color(0xFF9FD49F),
-    secondary = Color(0xFFAFCF9A),
-    tertiary = Color(0xFF94D1B2)
+private val VibrantDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFFB4A8),
+    secondary = Color(0xFFE7BDB6),
+    tertiary = Color(0xFFD0C58A),
+    background = Color(0xFF201A19),
+    surface = Color(0xFF201A19)
 )
 
-private val GreenLightColorScheme = lightColorScheme(
-    primary = Color(0xFF2F7D4F),
-    secondary = Color(0xFF5A7159),
-    tertiary = Color(0xFF1F8A70)
-)
-
-private val OrangeDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFC38C),
-    secondary = Color(0xFFFFB59F),
-    tertiary = Color(0xFFFFCC80)
-)
-
-private val OrangeLightColorScheme = lightColorScheme(
-    primary = Color(0xFFB45A2A),
-    secondary = Color(0xFF9A5F4A),
-    tertiary = Color(0xFF9A6C00)
+private val VibrantLightColorScheme = lightColorScheme(
+    primary = Color(0xFFBA1A1A),
+    secondary = Color(0xFF775651),
+    tertiary = Color(0xFF6F5D2F),
+    background = Color(0xFFFFF8F6),
+    surface = Color(0xFFFFF8F6)
 )
 
 @Composable
@@ -75,25 +76,24 @@ fun DartScorer_AndroidTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
+    val context = LocalContext.current
+    val supportsDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorScheme = when (colorTheme) {
+        AppColorTheme.MATERIAL_YOU ->
+            if (supportsDynamic) {
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            } else {
+                if (darkTheme) TonalSpotDarkColorScheme else TonalSpotLightColorScheme
+            }
 
-        darkTheme -> when (colorTheme) {
-            AppColorTheme.PURPLE -> PurpleDarkColorScheme
-            AppColorTheme.BLUE -> BlueDarkColorScheme
-            AppColorTheme.GREEN -> GreenDarkColorScheme
-            AppColorTheme.ORANGE -> OrangeDarkColorScheme
-        }
+        AppColorTheme.TONAL_SPOT ->
+            if (darkTheme) TonalSpotDarkColorScheme else TonalSpotLightColorScheme
 
-        else -> when (colorTheme) {
-            AppColorTheme.PURPLE -> PurpleLightColorScheme
-            AppColorTheme.BLUE -> BlueLightColorScheme
-            AppColorTheme.GREEN -> GreenLightColorScheme
-            AppColorTheme.ORANGE -> OrangeLightColorScheme
-        }
+        AppColorTheme.NEUTRAL ->
+            if (darkTheme) NeutralDarkColorScheme else NeutralLightColorScheme
+
+        AppColorTheme.VIBRANT ->
+            if (darkTheme) VibrantDarkColorScheme else VibrantLightColorScheme
     }
 
     MaterialTheme(

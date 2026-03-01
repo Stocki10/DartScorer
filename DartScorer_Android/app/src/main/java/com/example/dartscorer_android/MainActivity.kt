@@ -8,12 +8,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.dartscorer_android.ui.DartsGameScreen
 import com.example.dartscorer_android.ui.theme.AppColorTheme
+import com.example.dartscorer_android.ui.theme.AppThemeMode
 import com.example.dartscorer_android.ui.theme.DartScorer_AndroidTheme
 
 class MainActivity : ComponentActivity() {
@@ -22,28 +24,38 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val prefs = remember { getSharedPreferences(APP_PREFS, MODE_PRIVATE) }
-            var isDarkTheme by remember {
-                mutableStateOf(prefs.getBoolean(KEY_DARK_THEME, false))
+            var appThemeMode by remember {
+                mutableStateOf(
+                    prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name)
+                        ?.let { runCatching { AppThemeMode.valueOf(it) }.getOrDefault(AppThemeMode.SYSTEM) }
+                        ?: AppThemeMode.SYSTEM
+                )
             }
             var appColorTheme by remember {
                 mutableStateOf(
-                    prefs.getString(KEY_COLOR_THEME, AppColorTheme.PURPLE.name)
-                        ?.let { runCatching { AppColorTheme.valueOf(it) }.getOrDefault(AppColorTheme.PURPLE) }
-                        ?: AppColorTheme.PURPLE
+                    prefs.getString(KEY_COLOR_THEME, AppColorTheme.MATERIAL_YOU.name)
+                        ?.let { runCatching { AppColorTheme.valueOf(it) }.getOrDefault(AppColorTheme.MATERIAL_YOU) }
+                        ?: AppColorTheme.MATERIAL_YOU
                 )
+            }
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (appThemeMode) {
+                AppThemeMode.SYSTEM -> systemDark
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
             }
 
             DartScorer_AndroidTheme(
-                darkTheme = isDarkTheme,
+                darkTheme = darkTheme,
                 colorTheme = appColorTheme,
                 dynamicColor = false
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     DartsGameScreen(
-                        isDarkTheme = isDarkTheme,
-                        onThemeChange = { dark ->
-                            isDarkTheme = dark
-                            prefs.edit().putBoolean(KEY_DARK_THEME, dark).apply()
+                        selectedThemeMode = appThemeMode,
+                        onThemeModeChange = { mode ->
+                            appThemeMode = mode
+                            prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
                         },
                         selectedColorTheme = appColorTheme,
                         onColorThemeChange = { theme ->
@@ -58,7 +70,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val APP_PREFS = "dartscorer_android_prefs"
-        private const val KEY_DARK_THEME = "theme_dark"
+        private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_COLOR_THEME = "color_theme"
     }
 }

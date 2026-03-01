@@ -71,8 +71,10 @@ class DartsGame(
             val score = activePlayer.score
             val darts = remainingDarts
             if (darts <= 0) return "No finish available"
+            if (score > 170) return "No finish available"
             val suggestion = bestFinishEngine.getBestFinish(score = score, dartsRemaining = darts)
             if (suggestion.darts.isEmpty()) return "No finish available"
+            if (suggestion.label == "Setup" || suggestion.label == "Invalid") return "No finish available"
             return suggestion.darts.joinToString(" ") { bestFinishNotation(it) }
         }
 
@@ -138,7 +140,9 @@ class DartsGame(
                     setWinner = winningPlayer
                     statusMessage = "${winningPlayer.name} wins the set."
                 } else {
-                    startNewLeg(randomSequence = false, invertedSequence = true)
+                    winner = winningPlayer
+                    setWinner = null
+                    statusMessage = "${winningPlayer.name} wins the leg."
                 }
             } else {
                 winner = winningPlayer
