@@ -1,6 +1,6 @@
 import Foundation
 
-struct Turn: Equatable {
+struct Turn: Equatable, Codable {
     let startingScore: Int
     let openedAtTurnStart: Bool
     var darts: [DartThrow]

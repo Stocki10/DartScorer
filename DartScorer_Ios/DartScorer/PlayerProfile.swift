@@ -56,6 +56,11 @@ final class PlayerProfileStore: ObservableObject {
         save()
     }
 
+    func replaceAll(_ updated: [PlayerProfile]) {
+        profiles = updated
+        save()
+    }
+
     func delete(at offsets: IndexSet) {
         profiles.remove(atOffsets: offsets)
         save()

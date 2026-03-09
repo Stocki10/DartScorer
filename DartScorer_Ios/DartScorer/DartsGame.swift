@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-enum FinishRule: String, CaseIterable, Identifiable {
+enum FinishRule: String, CaseIterable, Identifiable, Codable {
     case doubleOut = "Double Out"
     case singleOut = "Single Out"
 
@@ -20,7 +20,7 @@ enum StartScoreOption: Int, CaseIterable, Identifiable {
     var label: String { "\(rawValue)" }
 }
 
-enum InRule: String, CaseIterable, Identifiable {
+enum InRule: String, CaseIterable, Identifiable, Codable {
     case `default` = "Default"
     case doubleIn = "Double In"
 
@@ -540,6 +540,59 @@ final class DartsGame: ObservableObject {
             return 0
         }
         return throwValue.points
+    }
+}
+
+// MARK: - Network Snapshot
+
+extension DartsGame {
+    func buildNetworkSnapshot() -> NetworkGameState {
+        NetworkGameState(
+            players: players,
+            activePlayerIndex: activePlayerIndex,
+            currentTurn: currentTurn,
+            winner: winner,
+            setWinner: setWinner,
+            statusMessage: statusMessage,
+            finishRule: finishRule.rawValue,
+            inRule: inRule.rawValue,
+            startingScore: startingScore,
+            setModeEnabled: setModeEnabled,
+            legsToWin: legsToWin,
+            legsWonByPlayerID: legsWonByPlayerID.stringKeyed,
+            lastTurnThrowsByPlayerID: lastTurnThrowsByPlayerID.stringKeyed,
+            pointsScoredByPlayerID: pointsScoredByPlayerID.stringKeyed,
+            dartsThrownByPlayerID: dartsThrownByPlayerID.stringKeyed,
+            hasOpenedLegByPlayerID: hasOpenedLegByPlayerID.stringKeyed,
+            highestTurnScoreByPlayerID: highestTurnScoreByPlayerID.stringKeyed,
+            checkoutOpportunitiesByPlayerID: checkoutOpportunitiesByPlayerID.stringKeyed,
+            checkoutConversionsByPlayerID: checkoutConversionsByPlayerID.stringKeyed,
+            highestCheckoutByPlayerID: highestCheckoutByPlayerID.stringKeyed
+        )
+    }
+
+    func applySnapshot(_ state: NetworkGameState) {
+        history.removeAll()
+        players = state.players
+        activePlayerIndex = state.activePlayerIndex
+        currentTurn = state.currentTurn
+        winner = state.winner
+        setWinner = state.setWinner
+        statusMessage = state.statusMessage
+        finishRule = FinishRule(rawValue: state.finishRule) ?? .doubleOut
+        inRule = InRule(rawValue: state.inRule) ?? .default
+        startingScore = state.startingScore
+        setModeEnabled = state.setModeEnabled
+        legsToWin = state.legsToWin
+        legsWonByPlayerID = state.legsWonByPlayerID.uuidKeyed()
+        lastTurnThrowsByPlayerID = state.lastTurnThrowsByPlayerID.uuidKeyed()
+        pointsScoredByPlayerID = state.pointsScoredByPlayerID.uuidKeyed()
+        dartsThrownByPlayerID = state.dartsThrownByPlayerID.uuidKeyed()
+        hasOpenedLegByPlayerID = state.hasOpenedLegByPlayerID.uuidKeyed()
+        highestTurnScoreByPlayerID = state.highestTurnScoreByPlayerID.uuidKeyed()
+        checkoutOpportunitiesByPlayerID = state.checkoutOpportunitiesByPlayerID.uuidKeyed()
+        checkoutConversionsByPlayerID = state.checkoutConversionsByPlayerID.uuidKeyed()
+        highestCheckoutByPlayerID = state.highestCheckoutByPlayerID.uuidKeyed()
     }
 }
 

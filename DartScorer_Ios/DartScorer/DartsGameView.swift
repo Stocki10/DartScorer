@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 
 struct DartsGameView: View {
-    @StateObject private var game = DartsGame(playerCount: 2)
+    @ObservedObject var game: DartsGame
+    @ObservedObject var session: MultipeerSessionManager
     @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
     @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
     @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
@@ -23,12 +24,14 @@ struct DartsGameView: View {
     @State private var setupSetModeEnabled = false
     @State private var setupLegsToWin = 3
     @State private var isShowingRestartAlert = false
+    @State private var isShowingDisconnectAlert = false
+    @State private var disconnectedPeerName: String?
     @State private var hasPresentedInitialSetup = false
     @State private var isShowingThemeSettings = false
     @State private var isShowingHistory = false
     @State private var isShowingProfiles = false
     @StateObject private var historyStore = GameHistoryStore()
-    @StateObject private var profileStore = PlayerProfileStore()
+    @ObservedObject var profileStore: PlayerProfileStore
     @State private var draftThemeMode: AppThemeMode = .light
     @State private var draftAccentColor: Color = AppAccentColor.makeColor(
         red: AppAccentColor.defaultRed,
@@ -37,6 +40,8 @@ struct DartsGameView: View {
     )
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+
+    private var isInputLocked: Bool { session.isInputLocked }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -78,6 +83,31 @@ struct DartsGameView: View {
             if let winner = game.winner {
                 winnerOverlay(for: winner)
             }
+
+            if session.isReconnecting {
+                VStack {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Reconnecting…")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                    .padding(.top, 8)
+
+                    Spacer()
+
+                    Button("Abort Connection") {
+                        session.endSession()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .padding(.bottom, 24)
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $isShowingNewGameSetup) {
@@ -89,12 +119,13 @@ struct DartsGameView: View {
                 setModeEnabled: $setupSetModeEnabled,
                 legsToWin: $setupLegsToWin,
                 profileStore: profileStore,
+                session: session,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
                     persistNewGameSettings()
                     let playerObjects = setupPlayers.map { sp in
                         Player(
-                            id: sp.profileID ?? UUID(),
+                            id: sp.profileID ?? sp.id,
                             name: sp.name,
                             score: setupStartScore.rawValue,
                             colorHex: sp.colorHex,
@@ -109,6 +140,10 @@ struct DartsGameView: View {
                         setModeEnabled: setupSetModeEnabled,
                         legsToWin: setupLegsToWin
                     )
+                    if session.role == .host {
+                        session.handleNewLeg()
+                        session.broadcastGameStarted()
+                    }
                     isShowingNewGameSetup = false
                 }
             )
@@ -128,6 +163,26 @@ struct DartsGameView: View {
         .sheet(isPresented: $isShowingProfiles) {
             PlayerProfileView(store: profileStore)
         }
+        .onChange(of: session.gameHasStarted) { _, started in
+            guard started && session.role == .joiner else { return }
+            isShowingNewGameSetup = false
+        }
+        .onChange(of: session.lastDisconnectedPeerName) { _, name in
+            guard let name else { return }
+            disconnectedPeerName = name
+        }
+        .alert("Player Disconnected", isPresented: Binding(
+            get: { disconnectedPeerName != nil },
+            set: { if !$0 { disconnectedPeerName = nil } }
+        )) {
+            Button("OK") { disconnectedPeerName = nil }
+        } message: {
+            if let name = disconnectedPeerName {
+                Text(session.isActive
+                     ? "\(name) has left the session."
+                     : "\(name) left — multiplayer session ended.")
+            }
+        }
         .onAppear {
             guard !hasPresentedInitialSetup else { return }
             hasPresentedInitialSetup = true
@@ -140,6 +195,16 @@ struct DartsGameView: View {
             }
         } message: {
             Text("You already started this leg. This will discard current progress.")
+        }
+        .alert("Leave Local Multiplayer Session?", isPresented: $isShowingDisconnectAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Leave Session", role: .destructive) {
+                session.endSession()
+            }
+        } message: {
+            Text(session.role == .host
+                ? "This will end the session for all connected devices."
+                : "You will be disconnected from the host's game.")
         }
     }
 
@@ -216,6 +281,7 @@ struct DartsGameView: View {
                 Image(systemName: "plus.circle")
             }
             .buttonStyle(.bordered)
+            .disabled(session.isActive && game.isLegInProgress)
 
             Button {
                 if game.isLegInProgress {
@@ -230,6 +296,24 @@ struct DartsGameView: View {
             .disabled(!game.isLegInProgress)
 
             Spacer(minLength: 0)
+
+            if session.role == .host {
+                Button {
+                    isShowingDisconnectAlert = true
+                } label: {
+                    Image(systemName: "wifi.slash")
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+            } else if session.role == .joiner {
+                Button {
+                    isShowingDisconnectAlert = true
+                } label: {
+                    Image(systemName: "person.fill.xmark")
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
+            }
 
             Button {
                 isShowingProfiles = true
@@ -259,12 +343,12 @@ struct DartsGameView: View {
             .buttonStyle(.bordered)
 
             Button {
-                game.undoLastThrow()
+                session.handleUndo()
             } label: {
                 Image(systemName: "arrow.uturn.backward")
             }
             .buttonStyle(.bordered)
-            .disabled(!game.canUndo)
+            .disabled(!game.canUndo || (session.isActive && !session.canUndoLocally))
         }
     }
 
@@ -312,20 +396,20 @@ struct DartsGameView: View {
                         submitThrowAndReset(.number(value), multiplier: selectedMultiplier)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(game.winner != nil)
+                    .disabled(game.winner != nil || isInputLocked)
                 }
 
                 Button(selectedMultiplier == .single ? "25" : "Bull") {
                     submitThrowAndReset(.bull, multiplier: selectedMultiplier)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(game.winner != nil || selectedMultiplier == .triple)
+                .disabled(game.winner != nil || selectedMultiplier == .triple || isInputLocked)
 
                 Button("0") {
                     submitThrowAndReset(.number(0), multiplier: .single)
                 }
                 .buttonStyle(.bordered)
-                .disabled(game.winner != nil)
+                .disabled(game.winner != nil || isInputLocked)
 
                 Color.clear.frame(height: 1)
                 Color.clear.frame(height: 1)
@@ -334,7 +418,7 @@ struct DartsGameView: View {
                     submitNoScoreTurn()
                 }
                 .buttonStyle(.bordered)
-                .disabled(game.winner != nil)
+                .disabled(game.winner != nil || isInputLocked)
                 .font(.footnote)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
@@ -358,21 +442,25 @@ struct DartsGameView: View {
                 Text(winningSubtitle)
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 12) {
-                    if game.setWinner == nil {
-                        Button("New Leg (Random)") {
-                            let record = game.buildGameRecord()
-                            historyStore.record(record)
-                            profileStore.updateStatsFromGameRecord(record)
-                            game.restartLegRandomSequence()
+                if session.role != .joiner {
+                    HStack(spacing: 12) {
+                        if game.setWinner == nil {
+                            Button("New Leg (Random)") {
+                                let record = game.buildGameRecord()
+                                historyStore.record(record)
+                                profileStore.updateStatsFromGameRecord(record)
+                                session.broadcastStatsUpdate()
+                                game.restartLegRandomSequence()
+                                session.handleNewLeg()
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
-                    }
 
-                    Button(game.setWinner == nil ? "New Game" : "Start New Game") {
-                        presentNewGameSetup()
+                        Button(game.setWinner == nil ? "New Game" : "Start New Game") {
+                            presentNewGameSetup()
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.bordered)
                 }
             }
             .padding()
@@ -380,12 +468,12 @@ struct DartsGameView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
             Button {
-                game.undoLastThrow()
+                session.handleUndo()
             } label: {
                 Image(systemName: "arrow.uturn.backward")
             }
             .buttonStyle(.bordered)
-            .disabled(!game.canUndo)
+            .disabled(!game.canUndo || (session.isActive && !session.canUndoLocally))
             .padding(.top, 12)
             .padding(.trailing, 12)
         }
@@ -406,7 +494,7 @@ struct DartsGameView: View {
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
         let previousScore = game.activePlayer.score
-        game.submitThrow(segment: segment, multiplier: multiplier)
+        session.handleThrow(segment: segment, multiplier: multiplier)
         selectedMultiplier = .single
         
         if let status = game.statusMessage {
@@ -423,15 +511,7 @@ struct DartsGameView: View {
     }
 
     private func submitNoScoreTurn() {
-        // Undo any darts already thrown this turn, then fill the turn with 3 zero-score throws.
-        let used = game.currentTurn.darts.count
-        for _ in 0..<used {
-            game.undoLastThrow()
-        }
-        for _ in 0..<3 {
-            game.submitThrow(segment: .number(0), multiplier: .single)
-        }
-        selectedMultiplier = .single
+        submitThrowAndReset(.number(0), multiplier: .single)
     }
 
     private func presentNewGameSetup() {
@@ -526,18 +606,28 @@ private struct NewGameSetupView: View {
     @Binding var setModeEnabled: Bool
     @Binding var legsToWin: Int
     let profileStore: PlayerProfileStore
+    @ObservedObject var session: MultipeerSessionManager
 
     let onCancel: () -> Void
     let onStart: () -> Void
 
     @State private var profilePickerPlayerID: UUID?
     @State private var isShowingProfileManagement = false
+    @State private var multiplayerInputMode: InputMode = .free
+    @State private var multiplayerUndoPermission: UndoPermission = .anyPlayer
+    @State private var isShowingHosting = false
+    @State private var isShowingJoining = false
+
+    private var maxPlayers: Int {
+        guard session.role == .host, !session.connectedPeers.isEmpty else { return 5 }
+        return min(5, session.connectedPeers.count + 1)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Game Settings") {
-                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 2...5)
+                    Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 2...maxPlayers)
 
                     Picker("Game", selection: $startScore) {
                         ForEach(StartScoreOption.allCases) { option in
@@ -620,6 +710,8 @@ private struct NewGameSetupView: View {
                         }
                     }
                 }
+
+                multiplayerSection
             }
             .navigationTitle("New Game")
             .toolbar {
@@ -635,10 +727,32 @@ private struct NewGameSetupView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)
+                        .disabled(session.role == .joiner)
                 }
             }
             .sheet(isPresented: $isShowingProfileManagement) {
                 PlayerProfileView(store: profileStore)
+            }
+            .sheet(isPresented: $isShowingHosting) {
+                NavigationStack {
+                    QRHostView(
+                        session: session,
+                        players: setupPlayersAsPlayers,
+                        onDismiss: { isShowingHosting = false }
+                    )
+                }
+            }
+            .sheet(isPresented: $isShowingJoining) {
+                NavigationStack {
+                    QRJoinerView(
+                        session: session,
+                        onDismiss: { isShowingJoining = false }
+                    )
+                }
+            }
+            .onChange(of: session.gameHasStarted) { _, started in
+                guard started && session.role == .joiner else { return }
+                isShowingJoining = false
             }
         }
         .onAppear {
@@ -648,6 +762,115 @@ private struct NewGameSetupView: View {
                     SetupPlayer(name: "Player 2", defaultName: "Player 2")
                 ]
             }
+            // Sync local pickers to session values when already in a session
+            if session.role != .none {
+                multiplayerInputMode = session.inputMode
+                multiplayerUndoPermission = session.undoPermission
+            }
+        }
+    }
+
+    // MARK: - Multiplayer Section
+
+    @ViewBuilder
+    private var multiplayerSection: some View {
+        Section("Local Multiplayer") {
+            switch session.role {
+            case .none:
+                Picker("Input Mode", selection: $multiplayerInputMode) {
+                    ForEach(InputMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                Text(multiplayerInputMode.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Undo", selection: $multiplayerUndoPermission) {
+                    ForEach(UndoPermission.allCases) { p in
+                        Text(p.label).tag(p)
+                    }
+                }
+
+                Button {
+                    session.hostSession(inputMode: multiplayerInputMode, undoPermission: multiplayerUndoPermission)
+                    isShowingHosting = true
+                } label: {
+                    Label("Host a Game", systemImage: "qrcode")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+
+                Button { isShowingJoining = true } label: {
+                    Label("Join a Game", systemImage: "camera")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+
+            case .host:
+                Label("Hosting: \(session.sessionToken)", systemImage: "wifi")
+                    .foregroundStyle(.secondary)
+                Text(session.connectedPeers.isEmpty
+                    ? "Waiting for devices to join…"
+                    : "\(session.connectedPeers.count + 1) device(s) connected")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Input Mode", selection: $multiplayerInputMode) {
+                    ForEach(InputMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .disabled(session.connectedPeers.isEmpty)
+                .onChange(of: multiplayerInputMode) { _, mode in
+                    session.updateSessionConfig(inputMode: mode, undoPermission: multiplayerUndoPermission)
+                }
+                Text(multiplayerInputMode.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Undo", selection: $multiplayerUndoPermission) {
+                    ForEach(UndoPermission.allCases) { p in
+                        Text(p.label).tag(p)
+                    }
+                }
+                .disabled(session.connectedPeers.isEmpty)
+                .onChange(of: multiplayerUndoPermission) { _, perm in
+                    session.updateSessionConfig(inputMode: multiplayerInputMode, undoPermission: perm)
+                }
+
+                Button { isShowingHosting = true } label: {
+                    Label("Manage Players", systemImage: "person.2")
+                }
+                Button("Stop Local Multiplayer", role: .destructive) {
+                    session.endSession()
+                }
+
+            case .joiner:
+                if session.connectedPeers.isEmpty {
+                    Label("Connecting…", systemImage: "wifi")
+                        .foregroundStyle(.secondary)
+                } else if session.gameHasStarted {
+                    Label("Game Starting", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Joined — Waiting for host to start", systemImage: "checkmark.circle")
+                        .foregroundStyle(.tint)
+                }
+                Button("Leave Session", role: .destructive) {
+                    session.endSession()
+                }
+            }
+        }
+    }
+
+    private var setupPlayersAsPlayers: [Player] {
+        setupPlayers.map { sp in
+            Player(
+                id: sp.profileID ?? sp.id,
+                name: sp.name,
+                score: 0,
+                colorHex: sp.colorHex,
+                profileID: sp.profileID
+            )
         }
     }
 
@@ -655,7 +878,7 @@ private struct NewGameSetupView: View {
         Binding(
             get: { setupPlayers.count },
             set: { newValue in
-                let clamped = min(max(2, newValue), 5)
+                let clamped = min(max(2, newValue), maxPlayers)
                 if clamped > setupPlayers.count {
                     let start = setupPlayers.count + 1
                     for index in start...clamped {
