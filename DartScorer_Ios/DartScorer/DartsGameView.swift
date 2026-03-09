@@ -24,6 +24,8 @@ struct DartsGameView: View {
     @State private var isShowingRestartAlert = false
     @State private var hasPresentedInitialSetup = false
     @State private var isShowingThemeSettings = false
+    @State private var isShowingHistory = false
+    @StateObject private var historyStore = GameHistoryStore()
     @State private var draftThemeMode: AppThemeMode = .light
     @State private var draftAccentColor: Color = AppAccentColor.makeColor(
         red: AppAccentColor.defaultRed,
@@ -56,15 +58,7 @@ struct DartsGameView: View {
 
                 Spacer(minLength: 0)
 
-                let finishLine = game.bestPossibleFinishLine
-                Text(finishLine ?? "No finish available")
-                    .font(.subheadline)
-                    .fontWeight(finishLine != nil ? .bold : .regular)
-                    .foregroundStyle(finishLine != nil ? Color.white : Color.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(finishLine != nil ? Color.accentColor : Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                checkoutBadge
                     .padding(.horizontal)
 
                 Divider()
@@ -114,6 +108,9 @@ struct DartsGameView: View {
                 applySettings()
             }
             .presentationBackground(.clear)
+        }
+        .sheet(isPresented: $isShowingHistory) {
+            GameHistoryView(store: historyStore)
         }
         .onAppear {
             guard !hasPresentedInitialSetup else { return }
@@ -193,22 +190,34 @@ struct DartsGameView: View {
     }   
 
     private var controlBar: some View {
-        HStack(spacing: 12) {
-            Button("New Game") {
+        HStack(spacing: 8) {
+            Button {
                 presentNewGameSetup()
+            } label: {
+                Image(systemName: "plus.circle")
             }
             .buttonStyle(.bordered)
 
-            Button("Restart Leg") {
+            Button {
                 if game.isLegInProgress {
                     isShowingRestartAlert = true
                 } else {
                     game.restartLeg()
                 }
+            } label: {
+                Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.bordered)
+            .disabled(!game.isLegInProgress)
 
             Spacer(minLength: 0)
+
+            Button {
+                isShowingHistory = true
+            } label: {
+                Image(systemName: "clock")
+            }
+            .buttonStyle(.bordered)
 
             Button {
                 draftThemeMode = AppThemeMode(rawValue: appThemeModeRaw) ?? .light
@@ -242,6 +251,31 @@ struct DartsGameView: View {
             }
             .pickerStyle(.segmented)
         }
+    }
+
+    private var checkoutBadge: some View {
+        let routes = game.bestPossibleFinishLines
+        let isBogey = game.isCurrentScoreBogey
+        let isHighlighted = !routes.isEmpty
+
+        let label: String
+        if isBogey {
+            label = "Bogey — no finish possible"
+        } else if routes.isEmpty {
+            label = "No finish available"
+        } else {
+            label = routes.joined(separator: "   ·   ")
+        }
+
+        return Text(label)
+            .font(.subheadline)
+            .fontWeight(isHighlighted ? .bold : .regular)
+            .lineLimit(1)
+            .foregroundStyle(isBogey ? Color.orange : (isHighlighted ? Color.white : Color.primary))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(isBogey ? Color.orange.opacity(0.12) : (isHighlighted ? Color.accentColor : Color(.secondarySystemBackground)))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private var numberPad: some View {
@@ -301,6 +335,7 @@ struct DartsGameView: View {
                 HStack(spacing: 12) {
                     if game.setWinner == nil {
                         Button("New Leg (Random)") {
+                            historyStore.record(game.buildGameRecord())
                             game.restartLegRandomSequence()
                         }
                         .buttonStyle(.borderedProminent)
@@ -372,6 +407,9 @@ struct DartsGameView: View {
     }
 
     private func presentNewGameSetup() {
+        if game.winner != nil {
+            historyStore.record(game.buildGameRecord())
+        }
         let persistedNames = persistedNewGamePlayerNames()
         let fallbackNames = game.players.enumerated().map { index, player in
             SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
