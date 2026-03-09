@@ -77,21 +77,14 @@ final class DartsGame: ObservableObject {
         !history.isEmpty
     }
 
-    var bestPossibleFinishLine: String {
-        guard winner == nil else { return "" }
+    var bestPossibleFinishLine: String? {
+        guard winner == nil else { return nil }
         let score = activePlayer.score
         let darts = remainingDarts
-        guard darts > 0 else { return "No finish available" }
+        guard darts > 0 else { return nil }
 
-        if let route = bestFinishRoute(for: score, dartsRemaining: darts) {
-            let text = route.map(throwNotation).joined(separator: " ")
-            return "\(text)"
-        }
-        return "No finish available"
-    }
-
-    var hasBestPossibleFinish: Bool {
-        bestPossibleFinishLine != "No finish available"
+        guard let route = bestFinishRoute(for: score, dartsRemaining: darts) else { return nil }
+        return route.map(throwNotation).joined(separator: " ")
     }
 
     var isLegInProgress: Bool {
@@ -282,7 +275,6 @@ final class DartsGame: ObservableObject {
 
     private func handleBust(for player: Player) {
         players[activePlayerIndex].score = currentTurn.startingScore
-        // statusMessage = "Bust for \(player.name)."
         endTurn()
     }
 

@@ -198,7 +198,7 @@ struct DartScorerTests {
         game.players[0].score = 1
         game.currentTurn = Turn(startingScore: 1)
 
-        #expect(game.bestPossibleFinishLine == "No finish available")
+        #expect(game.bestPossibleFinishLine == nil)
     }
 
     @Test func bestPossibleFinishCacheInvalidatesOnUndo() {

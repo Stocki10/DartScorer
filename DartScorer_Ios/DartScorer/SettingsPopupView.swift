@@ -1,7 +1,10 @@
 import SwiftUI
 
 struct SettingsPopupView: View {
+    private let buyMeACoffeeURL = URL(string: "https://buymeacoffee.com")!
+
     @Binding var themeMode: AppThemeMode
+    @Binding var accentColor: Color
 
     let onSave: () -> Void
 
@@ -55,6 +58,28 @@ struct SettingsPopupView: View {
                         .labelsHidden()
                         .frame(maxWidth: 180)
                     }
+
+                    HStack {
+                        Label("Color", systemImage: "paintpalette.fill")
+                        Spacer(minLength: 12)
+                        ColorPicker("Accent Color", selection: $accentColor, supportsOpacity: false)
+                            .labelsHidden()
+                    }
+
+                    Link(destination: buyMeACoffeeURL) {
+                        HStack(spacing: 12) {
+                            Label("Buy Me a Coffee", systemImage: "cup.and.saucer.fill")
+                            Spacer(minLength: 12)
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the Buy Me a Coffee page in your browser")
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -100,16 +125,25 @@ struct SettingsPopupView: View {
 
 private struct SettingsPopupPreviewHost: View {
     @State private var themeMode: AppThemeMode
+    @State private var accentColor: Color
     private let preferredScheme: ColorScheme?
 
     init(themeMode: AppThemeMode, preferredScheme: ColorScheme?) {
         _themeMode = State(initialValue: themeMode)
+        _accentColor = State(
+            initialValue: AppAccentColor.makeColor(
+                red: AppAccentColor.defaultRed,
+                green: AppAccentColor.defaultGreen,
+                blue: AppAccentColor.defaultBlue
+            )
+        )
         self.preferredScheme = preferredScheme
     }
 
     var body: some View {
         SettingsPopupView(
             themeMode: $themeMode,
+            accentColor: $accentColor,
             onSave: {}
         )
         .preferredColorScheme(preferredScheme)

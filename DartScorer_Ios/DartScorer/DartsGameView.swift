@@ -10,6 +10,9 @@ struct DartsGameView: View {
     @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
     @AppStorage("newGameSetModeEnabled") private var storedNewGameSetModeEnabled = false
     @AppStorage("newGameLegsToWin") private var storedNewGameLegsToWin = 3
+    @AppStorage("appAccentRed") private var appAccentRed = AppAccentColor.defaultRed
+    @AppStorage("appAccentGreen") private var appAccentGreen = AppAccentColor.defaultGreen
+    @AppStorage("appAccentBlue") private var appAccentBlue = AppAccentColor.defaultBlue
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
@@ -22,6 +25,11 @@ struct DartsGameView: View {
     @State private var hasPresentedInitialSetup = false
     @State private var isShowingThemeSettings = false
     @State private var draftThemeMode: AppThemeMode = .light
+    @State private var draftAccentColor: Color = AppAccentColor.makeColor(
+        red: AppAccentColor.defaultRed,
+        green: AppAccentColor.defaultGreen,
+        blue: AppAccentColor.defaultBlue
+    )
 
     private let numberColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
 
@@ -48,13 +56,14 @@ struct DartsGameView: View {
 
                 Spacer(minLength: 0)
 
-                Text(game.bestPossibleFinishLine)
+                let finishLine = game.bestPossibleFinishLine
+                Text(finishLine ?? "No finish available")
                     .font(.subheadline)
-                    .fontWeight(game.hasBestPossibleFinish ? .bold : .regular)
-                    .foregroundStyle(game.hasBestPossibleFinish ? Color.white : Color.primary)
+                    .fontWeight(finishLine != nil ? .bold : .regular)
+                    .foregroundStyle(finishLine != nil ? Color.white : Color.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(game.hasBestPossibleFinish ? Color.accentColor : Color(.secondarySystemBackground))
+                    .background(finishLine != nil ? Color.accentColor : Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .padding(.horizontal)
 
@@ -99,7 +108,8 @@ struct DartsGameView: View {
         }
         .fullScreenCover(isPresented: $isShowingThemeSettings) {
             SettingsPopupView(
-                themeMode: $draftThemeMode
+                themeMode: $draftThemeMode,
+                accentColor: $draftAccentColor
             ) {
                 applySettings()
             }
@@ -180,7 +190,7 @@ struct DartsGameView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
-    }
+    }   
 
     private var controlBar: some View {
         HStack(spacing: 12) {
@@ -202,6 +212,11 @@ struct DartsGameView: View {
 
             Button {
                 draftThemeMode = AppThemeMode(rawValue: appThemeModeRaw) ?? .light
+                draftAccentColor = AppAccentColor.makeColor(
+                    red: appAccentRed,
+                    green: appAccentGreen,
+                    blue: appAccentBlue
+                )
                 isShowingThemeSettings = true
             } label: {
                 Image(systemName: "gearshape")
@@ -301,8 +316,10 @@ struct DartsGameView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
-            Button("Back") {
+            Button {
                 game.undoLastThrow()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
             }
             .buttonStyle(.bordered)
             .disabled(!game.canUndo)
@@ -343,6 +360,7 @@ struct DartsGameView: View {
     }
 
     private func submitNoScoreTurn() {
+        // Undo any darts already thrown this turn, then fill the turn with 3 zero-score throws.
         let used = game.currentTurn.darts.count
         for _ in 0..<used {
             game.undoLastThrow()
@@ -383,6 +401,10 @@ struct DartsGameView: View {
 
     private func applySettings() {
         appThemeModeRaw = draftThemeMode.rawValue
+        let components = AppAccentColor.components(from: draftAccentColor)
+        appAccentRed = components.red
+        appAccentGreen = components.green
+        appAccentBlue = components.blue
     }
 
     private func persistNewGameSettings() {
