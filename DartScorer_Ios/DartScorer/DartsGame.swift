@@ -44,6 +44,9 @@ final class DartsGame: ObservableObject {
     @Published private(set) var pointsScoredByPlayerID: [UUID: Int] = [:]
     @Published private(set) var dartsThrownByPlayerID: [UUID: Int] = [:]
     @Published private(set) var hasOpenedLegByPlayerID: [UUID: Bool] = [:]
+    @Published private(set) var highestTurnScoreByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var checkoutOpportunitiesByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var checkoutConversionsByPlayerID: [UUID: Int] = [:]
 
     private var history: [GameSnapshot] = []
 
@@ -66,6 +69,7 @@ final class DartsGame: ObservableObject {
         resetSetState()
         resetOpenState()
         resetLegStats()
+        recordCheckoutOpportunityForCurrentPlayer()
     }
 
     var activePlayer: Player {
@@ -81,14 +85,22 @@ final class DartsGame: ObservableObject {
     }
 
     var bestPossibleFinishLine: String? {
-        guard winner == nil else { return nil }
-        let score = activePlayer.score
-        let darts = remainingDarts
-        guard darts > 0 else { return nil }
-
-        guard let route = bestFinishRoute(for: score, dartsRemaining: darts) else { return nil }
-        return route.map(throwNotation).joined(separator: " ")
+        bestPossibleFinishLines.first
     }
+
+    var bestPossibleFinishLines: [String] {
+        guard winner == nil, remainingDarts > 0 else { return [] }
+        let score = activePlayer.score
+        guard !Self.bogeyScores.contains(score) else { return [] }
+        return findTopRoutes(for: score, dartsRemaining: remainingDarts, maxRoutes: 3)
+    }
+
+    var isCurrentScoreBogey: Bool {
+        guard winner == nil else { return false }
+        return Self.bogeyScores.contains(activePlayer.score)
+    }
+
+    private static let bogeyScores: Set<Int> = [169, 168, 166, 165, 163, 162, 159]
 
     var isLegInProgress: Bool {
         guard winner == nil else { return false }
@@ -127,6 +139,8 @@ final class DartsGame: ObservableObject {
 
         if proposedScore == 0 {
             let winningPlayer = players[activePlayerIndex]
+            updateHighestTurnScore(for: winningPlayer.id, score: currentTurn.startingScore)
+            checkoutConversionsByPlayerID[winningPlayer.id, default: 0] += 1
             if setModeEnabled {
                 legsWonByPlayerID[winningPlayer.id, default: 0] += 1
                 if (legsWonByPlayerID[winningPlayer.id] ?? 0) >= legsToWin {
@@ -144,6 +158,10 @@ final class DartsGame: ObservableObject {
         }
 
         if currentTurn.dartsUsed == 3 {
+            updateHighestTurnScore(
+                for: players[activePlayerIndex].id,
+                score: currentTurn.startingScore - players[activePlayerIndex].score
+            )
             endTurn()
         }
     }
@@ -199,6 +217,7 @@ final class DartsGame: ObservableObject {
             startingScore: self.startingScore,
             openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
         )
+        recordCheckoutOpportunityForCurrentPlayer()
     }
 
     func newGame(playerNames: [String], finishRule: FinishRule) {
@@ -249,6 +268,9 @@ final class DartsGame: ObservableObject {
         pointsScoredByPlayerID = previous.pointsScoredByPlayerID
         dartsThrownByPlayerID = previous.dartsThrownByPlayerID
         hasOpenedLegByPlayerID = previous.hasOpenedLegByPlayerID
+        highestTurnScoreByPlayerID = previous.highestTurnScoreByPlayerID
+        checkoutOpportunitiesByPlayerID = previous.checkoutOpportunitiesByPlayerID
+        checkoutConversionsByPlayerID = previous.checkoutConversionsByPlayerID
     }
 
     func lastTurnThrows(for player: Player) -> [Int] {
@@ -264,6 +286,33 @@ final class DartsGame: ObservableObject {
 
     func legsWon(for player: Player) -> Int {
         legsWonByPlayerID[player.id] ?? 0
+    }
+
+    func buildGameRecord() -> GameRecord {
+        let results = players.map { player in
+            let darts = dartsThrownByPlayerID[player.id] ?? 0
+            let points = pointsScoredByPlayerID[player.id] ?? 0
+            let avg = darts > 0 ? (Double(points) / Double(darts)) * 3.0 : 0.0
+            let highest = highestTurnScoreByPlayerID[player.id] ?? 0
+            let opportunities = checkoutOpportunitiesByPlayerID[player.id] ?? 0
+            let conversions = checkoutConversionsByPlayerID[player.id] ?? 0
+            let checkoutPct: Double? = opportunities > 0 ? Double(conversions) / Double(opportunities) : nil
+            return PlayerGameResult(
+                id: player.id,
+                name: player.name,
+                average: avg,
+                highestTurnScore: highest,
+                checkoutPercentage: checkoutPct,
+                isWinner: winner?.id == player.id
+            )
+        }
+        return GameRecord(
+            id: UUID(),
+            date: Date(),
+            startingScore: startingScore,
+            finishRule: finishRule.rawValue,
+            playerResults: results
+        )
     }
 
     private func isBust(proposedScore: Int, throwValue: DartThrow, effectivePoints: Int) -> Bool {
@@ -289,6 +338,7 @@ final class DartsGame: ObservableObject {
             startingScore: nextScore,
             openedAtTurnStart: hasOpenedLegByPlayerID[nextPlayer.id] ?? (inRule == .default)
         )
+        recordCheckoutOpportunityForCurrentPlayer()
     }
 
     private func startNewLeg(randomSequence: Bool, invertedSequence: Bool) {
@@ -319,44 +369,61 @@ final class DartsGame: ObservableObject {
             startingScore: startingScore,
             openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
         )
+        recordCheckoutOpportunityForCurrentPlayer()
     }
 
-    private func bestFinishRoute(for score: Int, dartsRemaining: Int) -> [DartThrow]? {
-        guard score > 0 else { return nil }
+    private func findTopRoutes(for score: Int, dartsRemaining: Int, maxRoutes: Int) -> [String] {
+        guard score > 0 else { return [] }
         let candidates = checkoutCandidates
+        var notations: [String] = []
+        var usedFinisherPoints: Set<Int> = []
 
-        for dartCount in 1...dartsRemaining {
-            if let route = findRoute(
-                target: score,
-                dartsLeft: dartCount,
-                candidates: candidates,
-                current: []
-            ) {
-                return route
+        while notations.count < maxRoutes {
+            var found = false
+            for dartCount in 1...dartsRemaining {
+                if let route = findRouteExcluding(
+                    target: score,
+                    dartsLeft: dartCount,
+                    candidates: candidates,
+                    excludedFinisherPoints: usedFinisherPoints,
+                    current: []
+                ) {
+                    usedFinisherPoints.insert(route.last!.points)
+                    notations.append(route.map(throwNotation).joined(separator: " "))
+                    found = true
+                    break
+                }
             }
+            if !found { break }
         }
-        return nil
+        return notations
     }
 
-    private func findRoute(target: Int, dartsLeft: Int, candidates: [DartThrow], current: [DartThrow]) -> [DartThrow]? {
-        guard target >= 0 else { return nil }
-        guard dartsLeft > 0 else { return nil }
+    private func findRouteExcluding(
+        target: Int,
+        dartsLeft: Int,
+        candidates: [DartThrow],
+        excludedFinisherPoints: Set<Int>,
+        current: [DartThrow]
+    ) -> [DartThrow]? {
+        guard target >= 0, dartsLeft > 0 else { return nil }
 
         for dart in candidates {
             let remaining = target - dart.points
             if remaining < 0 { continue }
 
             if dartsLeft == 1 {
-                if remaining == 0 && canFinish(with: dart) {
+                if remaining == 0 && canFinish(with: dart) && !excludedFinisherPoints.contains(dart.points) {
                     return current + [dart]
                 }
                 continue
             }
 
-            if let route = findRoute(
+            if let route = findRouteExcluding(
                 target: remaining,
                 dartsLeft: dartsLeft - 1,
                 candidates: candidates,
+                excludedFinisherPoints: excludedFinisherPoints,
                 current: current + [dart]
             ) {
                 return route
@@ -448,6 +515,9 @@ private struct GameSnapshot {
     let pointsScoredByPlayerID: [UUID: Int]
     let dartsThrownByPlayerID: [UUID: Int]
     let hasOpenedLegByPlayerID: [UUID: Bool]
+    let highestTurnScoreByPlayerID: [UUID: Int]
+    let checkoutOpportunitiesByPlayerID: [UUID: Int]
+    let checkoutConversionsByPlayerID: [UUID: Int]
 }
 
 private extension DartsGame {
@@ -478,7 +548,10 @@ private extension DartsGame {
                 lastTurnThrowsByPlayerID: lastTurnThrowsByPlayerID,
                 pointsScoredByPlayerID: pointsScoredByPlayerID,
                 dartsThrownByPlayerID: dartsThrownByPlayerID,
-                hasOpenedLegByPlayerID: hasOpenedLegByPlayerID
+                hasOpenedLegByPlayerID: hasOpenedLegByPlayerID,
+                highestTurnScoreByPlayerID: highestTurnScoreByPlayerID,
+                checkoutOpportunitiesByPlayerID: checkoutOpportunitiesByPlayerID,
+                checkoutConversionsByPlayerID: checkoutConversionsByPlayerID
             )
         )
     }
@@ -495,9 +568,15 @@ private extension DartsGame {
     func resetLegStats() {
         pointsScoredByPlayerID = [:]
         dartsThrownByPlayerID = [:]
+        highestTurnScoreByPlayerID = [:]
+        checkoutOpportunitiesByPlayerID = [:]
+        checkoutConversionsByPlayerID = [:]
         for player in players {
             pointsScoredByPlayerID[player.id] = 0
             dartsThrownByPlayerID[player.id] = 0
+            highestTurnScoreByPlayerID[player.id] = 0
+            checkoutOpportunitiesByPlayerID[player.id] = 0
+            checkoutConversionsByPlayerID[player.id] = 0
         }
     }
 
@@ -527,5 +606,16 @@ private extension DartsGame {
         for player in players {
             hasOpenedLegByPlayerID[player.id] = (inRule == .default)
         }
+    }
+
+    func updateHighestTurnScore(for playerID: UUID, score: Int) {
+        guard score > 0 else { return }
+        highestTurnScoreByPlayerID[playerID] = max(highestTurnScoreByPlayerID[playerID] ?? 0, score)
+    }
+
+    func recordCheckoutOpportunityForCurrentPlayer() {
+        let score = players[activePlayerIndex].score
+        guard score > 1, score <= 170 else { return }
+        checkoutOpportunitiesByPlayerID[players[activePlayerIndex].id, default: 0] += 1
     }
 }
