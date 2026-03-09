@@ -1,13 +1,38 @@
 import Foundation
 import Combine
 
-struct PlayerGameResult: Codable, Identifiable {
+struct PlayerGameResult: Identifiable {
     let id: UUID
     let name: String
     let average: Double
     let highestTurnScore: Int
     let checkoutPercentage: Double?
     let isWinner: Bool
+    let profileID: UUID?
+    let totalDartsThrown: Int
+    let totalPointsScored: Int
+    let highestCheckout: Int
+}
+
+extension PlayerGameResult: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, name, average, highestTurnScore, checkoutPercentage, isWinner
+        case profileID, totalDartsThrown, totalPointsScored, highestCheckout
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        average = try c.decode(Double.self, forKey: .average)
+        highestTurnScore = try c.decode(Int.self, forKey: .highestTurnScore)
+        checkoutPercentage = try? c.decode(Double.self, forKey: .checkoutPercentage)
+        isWinner = try c.decode(Bool.self, forKey: .isWinner)
+        profileID = try? c.decode(UUID.self, forKey: .profileID)
+        totalDartsThrown = (try? c.decode(Int.self, forKey: .totalDartsThrown)) ?? 0
+        totalPointsScored = (try? c.decode(Int.self, forKey: .totalPointsScored)) ?? 0
+        highestCheckout = (try? c.decode(Int.self, forKey: .highestCheckout)) ?? 0
+    }
 }
 
 struct GameRecord: Codable, Identifiable {

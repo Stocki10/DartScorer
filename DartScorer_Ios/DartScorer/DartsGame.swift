@@ -47,6 +47,7 @@ final class DartsGame: ObservableObject {
     @Published private(set) var highestTurnScoreByPlayerID: [UUID: Int] = [:]
     @Published private(set) var checkoutOpportunitiesByPlayerID: [UUID: Int] = [:]
     @Published private(set) var checkoutConversionsByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var highestCheckoutByPlayerID: [UUID: Int] = [:]
 
     private var history: [GameSnapshot] = []
 
@@ -139,7 +140,9 @@ final class DartsGame: ObservableObject {
 
         if proposedScore == 0 {
             let winningPlayer = players[activePlayerIndex]
-            updateHighestTurnScore(for: winningPlayer.id, score: currentTurn.startingScore)
+            let checkoutScore = currentTurn.startingScore
+            updateHighestTurnScore(for: winningPlayer.id, score: checkoutScore)
+            highestCheckoutByPlayerID[winningPlayer.id] = max(highestCheckoutByPlayerID[winningPlayer.id] ?? 0, checkoutScore)
             checkoutConversionsByPlayerID[winningPlayer.id, default: 0] += 1
             if setModeEnabled {
                 legsWonByPlayerID[winningPlayer.id, default: 0] += 1
@@ -231,6 +234,40 @@ final class DartsGame: ObservableObject {
         )
     }
 
+    func newGame(
+        players inputPlayers: [Player],
+        finishRule: FinishRule,
+        inRule: InRule,
+        startingScore: Int,
+        setModeEnabled: Bool,
+        legsToWin: Int
+    ) {
+        history.removeAll()
+        lastTurnThrowsByPlayerID.removeAll()
+        self.startingScore = startingScore
+        self.finishRule = finishRule
+        self.inRule = inRule
+        self.setModeEnabled = setModeEnabled
+        self.legsToWin = max(1, legsToWin)
+        players = inputPlayers.map { p in
+            var player = p
+            player.score = startingScore
+            return player
+        }
+        resetSetState()
+        resetOpenState()
+        resetLegStats()
+        winner = nil
+        setWinner = nil
+        statusMessage = nil
+        activePlayerIndex = 0
+        currentTurn = Turn(
+            startingScore: self.startingScore,
+            openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
+        )
+        recordCheckoutOpportunityForCurrentPlayer()
+    }
+
     func newGame(playerCount: Int) {
         let clampedCount = min(max(2, playerCount), 5)
         let names = (1...clampedCount).map { index in
@@ -271,6 +308,7 @@ final class DartsGame: ObservableObject {
         highestTurnScoreByPlayerID = previous.highestTurnScoreByPlayerID
         checkoutOpportunitiesByPlayerID = previous.checkoutOpportunitiesByPlayerID
         checkoutConversionsByPlayerID = previous.checkoutConversionsByPlayerID
+        highestCheckoutByPlayerID = previous.highestCheckoutByPlayerID
     }
 
     func lastTurnThrows(for player: Player) -> [Int] {
@@ -297,13 +335,18 @@ final class DartsGame: ObservableObject {
             let opportunities = checkoutOpportunitiesByPlayerID[player.id] ?? 0
             let conversions = checkoutConversionsByPlayerID[player.id] ?? 0
             let checkoutPct: Double? = opportunities > 0 ? Double(conversions) / Double(opportunities) : nil
+            let highestCheckout = highestCheckoutByPlayerID[player.id] ?? 0
             return PlayerGameResult(
                 id: player.id,
                 name: player.name,
                 average: avg,
                 highestTurnScore: highest,
                 checkoutPercentage: checkoutPct,
-                isWinner: winner?.id == player.id
+                isWinner: winner?.id == player.id,
+                profileID: player.profileID,
+                totalDartsThrown: darts,
+                totalPointsScored: points,
+                highestCheckout: highestCheckout
             )
         }
         return GameRecord(
@@ -518,6 +561,7 @@ private struct GameSnapshot {
     let highestTurnScoreByPlayerID: [UUID: Int]
     let checkoutOpportunitiesByPlayerID: [UUID: Int]
     let checkoutConversionsByPlayerID: [UUID: Int]
+    let highestCheckoutByPlayerID: [UUID: Int]
 }
 
 private extension DartsGame {
@@ -551,7 +595,8 @@ private extension DartsGame {
                 hasOpenedLegByPlayerID: hasOpenedLegByPlayerID,
                 highestTurnScoreByPlayerID: highestTurnScoreByPlayerID,
                 checkoutOpportunitiesByPlayerID: checkoutOpportunitiesByPlayerID,
-                checkoutConversionsByPlayerID: checkoutConversionsByPlayerID
+                checkoutConversionsByPlayerID: checkoutConversionsByPlayerID,
+                highestCheckoutByPlayerID: highestCheckoutByPlayerID
             )
         )
     }
@@ -571,12 +616,14 @@ private extension DartsGame {
         highestTurnScoreByPlayerID = [:]
         checkoutOpportunitiesByPlayerID = [:]
         checkoutConversionsByPlayerID = [:]
+        highestCheckoutByPlayerID = [:]
         for player in players {
             pointsScoredByPlayerID[player.id] = 0
             dartsThrownByPlayerID[player.id] = 0
             highestTurnScoreByPlayerID[player.id] = 0
             checkoutOpportunitiesByPlayerID[player.id] = 0
             checkoutConversionsByPlayerID[player.id] = 0
+            highestCheckoutByPlayerID[player.id] = 0
         }
     }
 

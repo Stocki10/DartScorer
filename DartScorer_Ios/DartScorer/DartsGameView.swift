@@ -5,6 +5,7 @@ struct DartsGameView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
     @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
     @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
+    @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
     @AppStorage("newGameFinishRule") private var storedNewGameFinishRuleRaw = FinishRule.doubleOut.rawValue
     @AppStorage("newGameInRule") private var storedNewGameInRuleRaw = InRule.default.rawValue
     @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
@@ -25,7 +26,9 @@ struct DartsGameView: View {
     @State private var hasPresentedInitialSetup = false
     @State private var isShowingThemeSettings = false
     @State private var isShowingHistory = false
+    @State private var isShowingProfiles = false
     @StateObject private var historyStore = GameHistoryStore()
+    @StateObject private var profileStore = PlayerProfileStore()
     @State private var draftThemeMode: AppThemeMode = .light
     @State private var draftAccentColor: Color = AppAccentColor.makeColor(
         red: AppAccentColor.defaultRed,
@@ -85,11 +88,21 @@ struct DartsGameView: View {
                 startScore: $setupStartScore,
                 setModeEnabled: $setupSetModeEnabled,
                 legsToWin: $setupLegsToWin,
+                profileStore: profileStore,
                 onCancel: { isShowingNewGameSetup = false },
                 onStart: {
                     persistNewGameSettings()
+                    let playerObjects = setupPlayers.map { sp in
+                        Player(
+                            id: sp.profileID ?? UUID(),
+                            name: sp.name,
+                            score: setupStartScore.rawValue,
+                            colorHex: sp.colorHex,
+                            profileID: sp.profileID
+                        )
+                    }
                     game.newGame(
-                        playerNames: setupPlayers.map(\.name),
+                        players: playerObjects,
                         finishRule: setupFinishRule,
                         inRule: setupInRule,
                         startingScore: setupStartScore.rawValue,
@@ -111,6 +124,9 @@ struct DartsGameView: View {
         }
         .sheet(isPresented: $isShowingHistory) {
             GameHistoryView(store: historyStore)
+        }
+        .sheet(isPresented: $isShowingProfiles) {
+            PlayerProfileView(store: profileStore)
         }
         .onAppear {
             guard !hasPresentedInitialSetup else { return }
@@ -139,7 +155,7 @@ struct DartsGameView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.accentColor)
+                            .background(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
                     let throwsForBadge = throwsToDisplay(for: player, at: index)
@@ -183,7 +199,10 @@ struct DartsGameView: View {
                     }
                 }
                 .padding(10)
-                .background(index == game.activePlayerIndex ? Color.accentColor.opacity(0.18) : Color(.secondarySystemBackground))
+                .background {
+                    let playerColor = player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor
+                    return index == game.activePlayerIndex ? playerColor.opacity(0.18) : Color(.secondarySystemBackground)
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -211,6 +230,13 @@ struct DartsGameView: View {
             .disabled(!game.isLegInProgress)
 
             Spacer(minLength: 0)
+
+            Button {
+                isShowingProfiles = true
+            } label: {
+                Image(systemName: "person.crop.circle")
+            }
+            .buttonStyle(.bordered)
 
             Button {
                 isShowingHistory = true
@@ -335,7 +361,9 @@ struct DartsGameView: View {
                 HStack(spacing: 12) {
                     if game.setWinner == nil {
                         Button("New Leg (Random)") {
-                            historyStore.record(game.buildGameRecord())
+                            let record = game.buildGameRecord()
+                            historyStore.record(record)
+                            profileStore.updateStatsFromGameRecord(record)
                             game.restartLegRandomSequence()
                         }
                         .buttonStyle(.borderedProminent)
@@ -408,17 +436,27 @@ struct DartsGameView: View {
 
     private func presentNewGameSetup() {
         if game.winner != nil {
-            historyStore.record(game.buildGameRecord())
+            let record = game.buildGameRecord()
+            historyStore.record(record)
+            profileStore.updateStatsFromGameRecord(record)
         }
         let persistedNames = persistedNewGamePlayerNames()
         let fallbackNames = game.players.enumerated().map { index, player in
-            SetupPlayer(name: player.name, defaultName: "Player \(index + 1)")
+            SetupPlayer(name: player.name, defaultName: "Player \(index + 1)", colorHex: player.colorHex, profileID: player.profileID)
         }
         if persistedNames.isEmpty {
             setupPlayers = fallbackNames
         } else {
+            let persistedProfileIDs = persistedNewGamePlayerProfileIDs()
             setupPlayers = persistedNames.enumerated().map { index, name in
-                SetupPlayer(name: name, defaultName: "Player \(index + 1)")
+                let profileID = persistedProfileIDs.indices.contains(index) ? persistedProfileIDs[index] : nil
+                let profile = profileID.flatMap { id in profileStore.profiles.first { $0.id == id } }
+                return SetupPlayer(
+                    name: name,
+                    defaultName: "Player \(index + 1)",
+                    colorHex: profile?.colorHex,
+                    profileID: profile?.id
+                )
             }
         }
 
@@ -450,11 +488,21 @@ struct DartsGameView: View {
         if let data = try? JSONEncoder().encode(names), let json = String(data: data, encoding: .utf8) {
             storedNewGamePlayerNamesJSON = json
         }
+        let profileIDs = setupPlayers.map { $0.profileID?.uuidString ?? "" }
+        if let data = try? JSONEncoder().encode(profileIDs), let json = String(data: data, encoding: .utf8) {
+            storedPlayerProfileIDsJSON = json
+        }
         storedNewGameFinishRuleRaw = setupFinishRule.rawValue
         storedNewGameInRuleRaw = setupInRule.rawValue
         storedNewGameStartScoreRaw = setupStartScore.rawValue
         storedNewGameSetModeEnabled = setupSetModeEnabled
         storedNewGameLegsToWin = max(1, setupLegsToWin)
+    }
+
+    private func persistedNewGamePlayerProfileIDs() -> [UUID?] {
+        guard let data = storedPlayerProfileIDsJSON.data(using: .utf8),
+              let ids = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+        return ids.map { UUID(uuidString: $0) }
     }
 
     private func persistedNewGamePlayerNames() -> [String] {
@@ -477,9 +525,13 @@ private struct NewGameSetupView: View {
     @Binding var startScore: StartScoreOption
     @Binding var setModeEnabled: Bool
     @Binding var legsToWin: Int
+    let profileStore: PlayerProfileStore
 
     let onCancel: () -> Void
     let onStart: () -> Void
+
+    @State private var profilePickerPlayerID: UUID?
+    @State private var isShowingProfileManagement = false
 
     var body: some View {
         NavigationStack {
@@ -522,6 +574,18 @@ private struct NewGameSetupView: View {
                     List {
                         ForEach($setupPlayers) { $player in
                             HStack {
+                                Button {
+                                    profilePickerPlayerID = player.id
+                                } label: {
+                                    Circle()
+                                        .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color(.systemGray4))
+                                        .frame(width: 22, height: 22)
+                                        .overlay(
+                                            Circle().strokeBorder(Color(.systemGray3), lineWidth: player.colorHex == nil ? 1.5 : 0)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+
                                 TextField(player.defaultName, text: $player.name)
                                     .textInputAutocapitalization(.words)
                                     .disableAutocorrection(true)
@@ -532,6 +596,29 @@ private struct NewGameSetupView: View {
                     .listStyle(.plain)
                     .frame(minHeight: 250)
                     .environment(\.editMode, .constant(.active))
+                    .sheet(item: Binding(
+                        get: { profilePickerPlayerID.map { ProfilePickerTarget(id: $0) } },
+                        set: { profilePickerPlayerID = $0?.id }
+                    )) { target in
+                        let excludedIDs = Set(setupPlayers.compactMap { sp in
+                            sp.id == target.id ? nil : sp.profileID
+                        })
+                        ProfilePickerView(
+                            profiles: profileStore.profiles,
+                            excludedProfileIDs: excludedIDs
+                        ) { selectedProfile in
+                            if let idx = setupPlayers.firstIndex(where: { $0.id == target.id }) {
+                                if let profile = selectedProfile {
+                                    setupPlayers[idx].name = profile.name
+                                    setupPlayers[idx].colorHex = profile.colorHex
+                                    setupPlayers[idx].profileID = profile.id
+                                } else {
+                                    setupPlayers[idx].colorHex = nil
+                                    setupPlayers[idx].profileID = nil
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("New Game")
@@ -539,9 +626,19 @@ private struct NewGameSetupView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", role: .destructive, action: onCancel)
                 }
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        isShowingProfileManagement = true
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)
                 }
+            }
+            .sheet(isPresented: $isShowingProfileManagement) {
+                PlayerProfileView(store: profileStore)
             }
         }
         .onAppear {
@@ -562,7 +659,7 @@ private struct NewGameSetupView: View {
                 if clamped > setupPlayers.count {
                     let start = setupPlayers.count + 1
                     for index in start...clamped {
-                        setupPlayers.append(SetupPlayer(name: "Player \(index)", defaultName: "Player \(index)"))
+                        setupPlayers.append(SetupPlayer(name: "Player \(index)", defaultName: "Player \(index)", colorHex: nil, profileID: nil))
                     }
                 } else if clamped < setupPlayers.count {
                     setupPlayers = Array(setupPlayers.prefix(clamped))
@@ -580,10 +677,18 @@ private struct SetupPlayer: Identifiable, Equatable {
     let id: UUID
     var name: String
     var defaultName: String
+    var colorHex: String?
+    var profileID: UUID?
 
-    init(id: UUID = UUID(), name: String, defaultName: String) {
+    init(id: UUID = UUID(), name: String, defaultName: String, colorHex: String? = nil, profileID: UUID? = nil) {
         self.id = id
         self.name = name
         self.defaultName = defaultName
+        self.colorHex = colorHex
+        self.profileID = profileID
     }
+}
+
+private struct ProfilePickerTarget: Identifiable {
+    let id: UUID
 }
