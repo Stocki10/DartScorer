@@ -9,8 +9,11 @@ enum FinishRule: String, CaseIterable, Identifiable {
 }
 
 enum StartScoreOption: Int, CaseIterable, Identifiable {
-    case score501 = 501
+    case score101 = 101
     case score301 = 301
+    case score501 = 501
+    case score701 = 701
+    case score1001 = 1001
 
     var id: Int { rawValue }
 

@@ -11,8 +11,11 @@ enum class InRule(val label: String) {
 }
 
 enum class StartScoreOption(val score: Int) {
+    SCORE_101(101),
+    SCORE_301(301),
     SCORE_501(501),
-    SCORE_301(301);
+    SCORE_701(701),
+    SCORE_1001(1001);
 
     val label: String
         get() = score.toString()

@@ -121,7 +121,7 @@ fun DartsGameScreen(
     }
     val initialStartScore = remember {
         val stored = prefs.getInt(KEY_SETUP_START_SCORE, StartScoreOption.SCORE_501.score)
-        if (stored == StartScoreOption.SCORE_301.score) StartScoreOption.SCORE_301 else StartScoreOption.SCORE_501
+        StartScoreOption.entries.find { it.score == stored } ?: StartScoreOption.SCORE_501
     }
     val initialSetMode = remember { prefs.getBoolean(KEY_SETUP_SET_MODE, false) }
     val initialLegsToWin = remember { prefs.getInt(KEY_SETUP_LEGS_TO_WIN, 3).coerceAtLeast(1) }
@@ -169,7 +169,7 @@ fun DartsGameScreen(
         }
         setupFinishRule = game.finishRule
         setupInRule = game.inRule
-        setupStartScore = if (game.startingScore == 301) StartScoreOption.SCORE_301 else StartScoreOption.SCORE_501
+        setupStartScore = StartScoreOption.entries.find { it.score == game.startingScore } ?: StartScoreOption.SCORE_501
         setupSetModeEnabled = game.setModeEnabled
         setupLegsToWin = game.legsToWin
     }
