@@ -343,7 +343,7 @@ struct DartsGameView: View {
             .buttonStyle(.bordered)
 
             Button {
-                session.handleUndo()
+                if session.isActive { session.handleUndo() } else { game.undoLastThrow() }
             } label: {
                 Image(systemName: "arrow.uturn.backward")
             }
@@ -468,7 +468,7 @@ struct DartsGameView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) {
             Button {
-                session.handleUndo()
+                if session.isActive { session.handleUndo() } else { game.undoLastThrow() }
             } label: {
                 Image(systemName: "arrow.uturn.backward")
             }
@@ -494,7 +494,11 @@ struct DartsGameView: View {
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
         let previousScore = game.activePlayer.score
-        session.handleThrow(segment: segment, multiplier: multiplier)
+        if session.isActive {
+            session.handleThrow(segment: segment, multiplier: multiplier)
+        } else {
+            game.submitThrow(segment: segment, multiplier: multiplier)
+        }
         selectedMultiplier = .single
         
         if let status = game.statusMessage {
@@ -511,7 +515,18 @@ struct DartsGameView: View {
     }
 
     private func submitNoScoreTurn() {
-        submitThrowAndReset(.number(0), multiplier: .single)
+        let remaining = game.currentTurn.dartsRemaining
+        guard remaining > 0 else { return }
+        if session.isActive {
+            for _ in 0..<remaining {
+                session.handleThrow(segment: .number(0), multiplier: .single)
+            }
+        } else {
+            for _ in 0..<remaining {
+                game.submitThrow(segment: .number(0), multiplier: .single)
+            }
+        }
+        selectedMultiplier = .single
     }
 
     private func presentNewGameSetup() {
