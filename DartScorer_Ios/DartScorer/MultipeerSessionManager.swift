@@ -134,6 +134,17 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
         }
     }
 
+    func handleRestartLeg() {
+        guard let game = game else { return }
+        if role == .none {
+            game.restartLeg()
+            return
+        }
+        guard role == .host else { return }
+        game.restartLeg()
+        broadcastAfterHostMutation(turnEnded: true)
+    }
+
     func updateSessionConfig(inputMode: InputMode, undoPermission: UndoPermission) {
         guard role == .host else { return }
         self.inputMode = inputMode

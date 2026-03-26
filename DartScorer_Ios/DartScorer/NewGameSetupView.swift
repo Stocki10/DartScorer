@@ -1,0 +1,316 @@
+import SwiftUI
+
+struct NewGameSetupView: View {
+    @Binding var setupPlayers: [SetupPlayer]
+    @Binding var finishRule: FinishRule
+    @Binding var inRule: InRule
+    @Binding var startScore: StartScoreOption
+    @Binding var setModeEnabled: Bool
+    @Binding var legsToWin: Int
+    let profileStore: PlayerProfileStore
+    @ObservedObject var session: MultipeerSessionManager
+
+    let onCancel: () -> Void
+    let onStart: () -> Void
+
+    @State private var profilePickerPlayerID: UUID?
+    @State private var isShowingProfileManagement = false
+    @State private var multiplayerInputMode: InputMode = .free
+    @State private var multiplayerUndoPermission: UndoPermission = .anyPlayer
+    @State private var isShowingHosting = false
+    @State private var isShowingJoining = false
+
+    private var maxPlayers: Int {
+        guard session.role == .host, !session.connectedPeers.isEmpty else { return 5 }
+        return min(5, session.connectedPeers.count + 1)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                gameSettingsSection
+                playerOrderSection
+                multiplayerSection
+            }
+            .navigationTitle("New Game")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .destructive, action: onCancel)
+                }
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        isShowingProfileManagement = true
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Start", action: onStart)
+                        .disabled(session.role == .joiner)
+                }
+            }
+            .sheet(isPresented: $isShowingProfileManagement) {
+                PlayerProfileView(store: profileStore)
+            }
+            .sheet(isPresented: $isShowingHosting) {
+                NavigationStack {
+                    QRHostView(
+                        session: session,
+                        players: setupPlayersAsPlayers,
+                        onDismiss: { isShowingHosting = false }
+                    )
+                }
+            }
+            .sheet(isPresented: $isShowingJoining) {
+                NavigationStack {
+                    QRJoinerView(
+                        session: session,
+                        onDismiss: { isShowingJoining = false }
+                    )
+                }
+            }
+            .onChange(of: session.gameHasStarted) { _, started in
+                guard started && session.role == .joiner else { return }
+                isShowingJoining = false
+            }
+        }
+        .onAppear {
+            if setupPlayers.isEmpty {
+                setupPlayers = [
+                    SetupPlayer(name: "Player 1", defaultName: "Player 1"),
+                    SetupPlayer(name: "Player 2", defaultName: "Player 2")
+                ]
+            }
+            if session.role != .none {
+                multiplayerInputMode = session.inputMode
+                multiplayerUndoPermission = session.undoPermission
+            }
+        }
+    }
+
+    private var gameSettingsSection: some View {
+        Section("Game Settings") {
+            Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 2...maxPlayers)
+
+            Picker("Game", selection: $startScore) {
+                ForEach(StartScoreOption.allCases) { option in
+                    Text(option.label).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Picker("Finish Mode", selection: $finishRule) {
+                ForEach(FinishRule.allCases) { rule in
+                    Text(rule.rawValue).tag(rule)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Picker("In Mode", selection: $inRule) {
+                ForEach(InRule.allCases) { rule in
+                    Text(rule.rawValue).tag(rule)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Toggle("Set Mode", isOn: $setModeEnabled)
+            if setModeEnabled {
+                Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
+            }
+        }
+    }
+
+    private var playerOrderSection: some View {
+        Section("Player Order") {
+            Text("Drag rows to set the throw sequence.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            List {
+                ForEach($setupPlayers) { $player in
+                    HStack {
+                        Button {
+                            profilePickerPlayerID = player.id
+                        } label: {
+                            Circle()
+                                .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color(.systemGray4))
+                                .frame(width: 22, height: 22)
+                                .overlay(
+                                    Circle().strokeBorder(
+                                        Color(.systemGray3),
+                                        lineWidth: player.colorHex == nil ? 1.5 : 0
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        TextField(player.defaultName, text: $player.name)
+                            .textInputAutocapitalization(.words)
+                            .disableAutocorrection(true)
+                    }
+                }
+                .onMove(perform: movePlayers)
+            }
+            .listStyle(.plain)
+            .frame(minHeight: 250)
+            .environment(\.editMode, .constant(.active))
+            .sheet(item: Binding(
+                get: { profilePickerPlayerID.map { ProfilePickerTarget(id: $0) } },
+                set: { profilePickerPlayerID = $0?.id }
+            )) { target in
+                let excludedIDs = Set(setupPlayers.compactMap { player in
+                    player.id == target.id ? nil : player.profileID
+                })
+                ProfilePickerView(
+                    profiles: profileStore.profiles,
+                    excludedProfileIDs: excludedIDs
+                ) { selectedProfile in
+                    if let index = setupPlayers.firstIndex(where: { $0.id == target.id }) {
+                        if let profile = selectedProfile {
+                            setupPlayers[index].name = profile.name
+                            setupPlayers[index].colorHex = profile.colorHex
+                            setupPlayers[index].profileID = profile.id
+                        } else {
+                            setupPlayers[index].colorHex = nil
+                            setupPlayers[index].profileID = nil
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var multiplayerSection: some View {
+        Section("Local Multiplayer") {
+            switch session.role {
+            case .none:
+                Picker("Input Mode", selection: $multiplayerInputMode) {
+                    ForEach(InputMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                Text(multiplayerInputMode.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Undo", selection: $multiplayerUndoPermission) {
+                    ForEach(UndoPermission.allCases) { permission in
+                        Text(permission.label).tag(permission)
+                    }
+                }
+
+                Button {
+                    session.hostSession(inputMode: multiplayerInputMode, undoPermission: multiplayerUndoPermission)
+                    isShowingHosting = true
+                } label: {
+                    Label("Host a Game", systemImage: "qrcode")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+
+                Button {
+                    isShowingJoining = true
+                } label: {
+                    Label("Join a Game", systemImage: "camera")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+
+            case .host:
+                Label("Hosting: \(session.sessionToken)", systemImage: "wifi")
+                    .foregroundStyle(.secondary)
+                Text(session.connectedPeers.isEmpty
+                    ? "Waiting for devices to join…"
+                    : "\(session.connectedPeers.count + 1) device(s) connected")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Input Mode", selection: $multiplayerInputMode) {
+                    ForEach(InputMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .disabled(session.connectedPeers.isEmpty)
+                .onChange(of: multiplayerInputMode) { _, mode in
+                    session.updateSessionConfig(inputMode: mode, undoPermission: multiplayerUndoPermission)
+                }
+                Text(multiplayerInputMode.explanation)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Picker("Undo", selection: $multiplayerUndoPermission) {
+                    ForEach(UndoPermission.allCases) { permission in
+                        Text(permission.label).tag(permission)
+                    }
+                }
+                .disabled(session.connectedPeers.isEmpty)
+                .onChange(of: multiplayerUndoPermission) { _, permission in
+                    session.updateSessionConfig(inputMode: multiplayerInputMode, undoPermission: permission)
+                }
+
+                Button {
+                    isShowingHosting = true
+                } label: {
+                    Label("Manage Players", systemImage: "person.2")
+                }
+                Button("Stop Local Multiplayer", role: .destructive) {
+                    session.endSession()
+                }
+
+            case .joiner:
+                if session.connectedPeers.isEmpty {
+                    Label("Connecting…", systemImage: "wifi")
+                        .foregroundStyle(.secondary)
+                } else if session.gameHasStarted {
+                    Label("Game Starting", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Joined — Waiting for host to start", systemImage: "checkmark.circle")
+                        .foregroundStyle(.tint)
+                }
+                Button("Leave Session", role: .destructive) {
+                    session.endSession()
+                }
+            }
+        }
+    }
+
+    private var setupPlayersAsPlayers: [Player] {
+        setupPlayers.map { player in
+            Player(
+                id: player.profileID ?? player.id,
+                name: player.name,
+                score: 0,
+                colorHex: player.colorHex,
+                profileID: player.profileID
+            )
+        }
+    }
+
+    private var playerCountBinding: Binding<Int> {
+        Binding(
+            get: { setupPlayers.count },
+            set: { newValue in
+                let clamped = min(max(2, newValue), maxPlayers)
+                if clamped > setupPlayers.count {
+                    let start = setupPlayers.count + 1
+                    for index in start...clamped {
+                        setupPlayers.append(
+                            SetupPlayer(
+                                name: "Player \(index)",
+                                defaultName: "Player \(index)",
+                                colorHex: nil,
+                                profileID: nil
+                            )
+                        )
+                    }
+                } else if clamped < setupPlayers.count {
+                    setupPlayers = Array(setupPlayers.prefix(clamped))
+                }
+            }
+        )
+    }
+
+    private func movePlayers(from source: IndexSet, to destination: Int) {
+        setupPlayers.move(fromOffsets: source, toOffset: destination)
+    }
+}

@@ -135,7 +135,9 @@ final class DartsGame: ObservableObject {
         }
 
         addScoredPoints(effectivePoints, for: player.id)
-        players[activePlayerIndex].score = proposedScore
+        var updatedPlayers = players
+        updatedPlayers[activePlayerIndex].score = proposedScore
+        players = updatedPlayers
         currentTurn.darts.append(throwValue)
 
         if proposedScore == 0 {
@@ -286,7 +288,9 @@ final class DartsGame: ObservableObject {
     func updatePlayerName(index: Int, name: String) {
         guard players.indices.contains(index) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        players[index].name = trimmed.isEmpty ? "Player \(index + 1)" : trimmed
+        var updatedPlayers = players
+        updatedPlayers[index].name = trimmed.isEmpty ? "Player \(index + 1)" : trimmed
+        players = updatedPlayers
     }
 
     func undoLastThrow() {
@@ -369,7 +373,9 @@ final class DartsGame: ObservableObject {
     }
 
     private func handleBust(for player: Player) {
-        players[activePlayerIndex].score = currentTurn.startingScore
+        var updatedPlayers = players
+        updatedPlayers[activePlayerIndex].score = currentTurn.startingScore
+        players = updatedPlayers
         endTurn()
     }
 
@@ -405,9 +411,7 @@ final class DartsGame: ObservableObject {
 
         activePlayerIndex = 0
         resetOpenState()
-        for index in players.indices {
-            players[index].score = startingScore
-        }
+        players = players.map { p in var q = p; q.score = startingScore; return q }
         currentTurn = Turn(
             startingScore: startingScore,
             openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)

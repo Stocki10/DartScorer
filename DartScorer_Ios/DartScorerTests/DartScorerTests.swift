@@ -70,6 +70,23 @@ struct DartScorerTests {
         #expect(game.currentTurn.darts.isEmpty)
     }
 
+    @Test func player2ScoresAfterPlayer1TurnEnds() {
+        let game = DartsGame(playerCount: 2)
+
+        // Player 1 completes their turn (3 darts)
+        game.submitThrow(segment: .number(1), multiplier: .single)
+        game.submitThrow(segment: .number(1), multiplier: .single)
+        game.submitThrow(segment: .number(1), multiplier: .single)
+
+        #expect(game.activePlayerIndex == 1)
+
+        // Player 2 throws T20
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.players[1].score == 441)
+        #expect(game.activePlayerIndex == 1)
+    }
+
     @Test func winningThrowSetsWinnerOnDoubleOut() {
         let game = DartsGame(playerCount: 2)
         game.players[0].score = 40
