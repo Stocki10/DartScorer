@@ -30,6 +30,30 @@ struct NewGameSetupView: View {
         gameMode == .practice ? 1 : 2
     }
 
+    private var modeDescriptionTitle: String {
+        switch gameMode {
+        case .x01:
+            return startScore.label
+        case .practice:
+            return "Practice"
+        case .cricket:
+            return "Cricket"
+        }
+    }
+
+    private var modeDescriptionText: String {
+        switch gameMode {
+        case .x01:
+            let inText = inRule == .doubleIn ? "double-in" : "default-in"
+            let outText = finishRule == .doubleOut ? "double-out" : "single-out"
+            return "Start on \(startScore.label) and check out with \(inText), \(outText) rules."
+        case .practice:
+            return "Score keeps going up. Turns rotate after three darts and there is no bust or checkout."
+        case .cricket:
+            return "Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open."
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -117,6 +141,18 @@ struct NewGameSetupView: View {
 
             Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: minimumPlayers...maxPlayers)
 
+            VStack(alignment: .leading, spacing: 4) {
+                Text(modeDescriptionTitle)
+                    .font(.subheadline.weight(.semibold))
+                Text(modeDescriptionText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
             if gameMode == .x01 {
                 Picker("Game", selection: $startScore) {
                     ForEach(StartScoreOption.allCases) { option in
@@ -143,10 +179,6 @@ struct NewGameSetupView: View {
                 if setModeEnabled {
                     Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
                 }
-            } else {
-                Text("Practice keeps a running total and rotates after every three darts.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
         }
     }

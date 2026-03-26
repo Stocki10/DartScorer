@@ -120,6 +120,29 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
         }
     }
 
+    func handleQuickScore(_ score: Int) {
+        guard let game = game else { return }
+        guard !isInputLocked else { return }
+
+        if role == .none {
+            game.submitQuickScore(score)
+            return
+        }
+        if role == .host {
+            let prevIdx = game.activePlayerIndex
+            game.submitQuickScore(score)
+            let turnEnded = game.activePlayerIndex != prevIdx || game.winner != nil
+            broadcastAfterHostMutation(turnEnded: turnEnded)
+        } else {
+            let payload = QuickScoreUpdatePayload(
+                playerID: game.activePlayer.id.uuidString,
+                score: score,
+                turnSequence: currentTurnSequence
+            )
+            sendToHost(.quickScoreUpdate(payload))
+        }
+    }
+
     func handleUndo() {
         guard let game = game else { return }
         if role == .none {
@@ -297,6 +320,27 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
             }
             let prevIdx = game.activePlayerIndex
             game.submitThrow(segment: payload.segment, multiplier: payload.multiplier)
+            let turnEnded = game.activePlayerIndex != prevIdx || game.winner != nil
+            broadcastAfterHostMutation(turnEnded: turnEnded)
+
+        case .quickScoreUpdate(let payload):
+            guard role == .host, let game = game else { return }
+            guard payload.turnSequence == currentTurnSequence else { return }
+            let peerDID = peerDeviceIDs[peer] ?? peer.displayName
+            let peerPlayers = Set((playerAssignments[peerDID] ?? []).compactMap { UUID(uuidString: $0) })
+            let activeID = game.activePlayer.id
+            switch inputMode {
+            case .ownOnly:    guard peerPlayers.contains(activeID) else { return }
+            case .othersOnly: guard !peerPlayers.contains(activeID) else { return }
+            case .free:
+                if let holder = lockDeviceID, holder != peerDID { return }
+                if lockDeviceID == nil {
+                    lockDeviceID = peerDID
+                    broadcastMessage(.turnLock(TurnLockPayload(deviceID: peerDID, turnSequence: currentTurnSequence)))
+                }
+            }
+            let prevIdx = game.activePlayerIndex
+            game.submitQuickScore(payload.score)
             let turnEnded = game.activePlayerIndex != prevIdx || game.winner != nil
             broadcastAfterHostMutation(turnEnded: turnEnded)
 

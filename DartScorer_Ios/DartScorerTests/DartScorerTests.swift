@@ -258,6 +258,60 @@ struct DartScorerTests {
         #expect(game.players[0].score == 0)
     }
 
+    @Test func quickScoreSubtractsAndEndsTurnInX01() {
+        let game = DartsGame(playerCount: 2)
+
+        game.submitQuickScore(100)
+
+        #expect(game.players[0].score == 401)
+        #expect(game.activePlayerIndex == 1)
+        #expect(game.currentTurn.darts.isEmpty)
+        #expect(game.lastTurnThrows(for: game.players[0]) == [100])
+    }
+
+    @Test func quickScoreAccumulatesInPractice() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice)
+
+        game.submitQuickScore(140)
+
+        #expect(game.players[0].score == 140)
+        #expect(game.activePlayerIndex == 0)
+        #expect(game.lastTurnThrows(for: game.players[0]) == [140])
+    }
+
+    @Test func cricketDoubleBullCountsAsTwoMarks() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+
+        game.submitThrow(segment: .bull, multiplier: .double)
+
+        #expect(game.cricketMarks(for: game.players[0], target: .bull) == 2)
+        #expect(game.lastTurnThrows(for: game.players[0]) == [50])
+    }
+
+    @Test func cricketCountsMarksAndScoresOverflow() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.cricketMarks(for: game.players[0], target: .twenty) == 3)
+        #expect(game.cricketScore(for: game.players[0]) == 60)
+    }
+
+    @Test func cricketWinnerRequiresClosedTargetsAndLead() {
+        let game = DartsGame(playerCount: 1, gameMode: .cricket)
+
+        for target in game.cricketTargets {
+            let segment: DartSegment = target == .bull ? .bull : .number(target.rawValue)
+            let multiplier: DartMultiplier = target == .bull ? .double : .triple
+            game.submitThrow(segment: segment, multiplier: multiplier)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+        }
+
+        #expect(game.winner?.id == game.players[0].id)
+    }
+
     @Test func bestPossibleFinishCacheInvalidatesOnUndo() {
         let game = DartsGame(playerCount: 2)
         
@@ -312,13 +366,21 @@ struct DartScorerTests {
                     id: UUID(),
                     name: "A",
                     average: 60,
+                    firstNineAverage: nil,
                     highestTurnScore: 100,
+                    highestScore: 100,
                     checkoutPercentage: 0.5,
+                    checkoutAttempts: 2,
+                    checkoutHits: 1,
                     isWinner: true,
                     profileID: nil,
                     totalDartsThrown: 18,
                     totalPointsScored: 360,
-                    highestCheckout: 40
+                    highestCheckout: 40,
+                    score180Count: 0,
+                    score140PlusCount: 1,
+                    totalFirstNinePoints: 180,
+                    totalFirstNineDarts: 9
                 )
             ]
         )

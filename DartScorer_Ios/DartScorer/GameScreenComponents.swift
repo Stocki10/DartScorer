@@ -1,5 +1,135 @@
 import SwiftUI
 
+enum ScoreEntryMode: String, CaseIterable, Identifiable {
+    case throwsMode = "Throws"
+    case quick = "Quick"
+
+    var id: String { rawValue }
+
+    var label: String { rawValue }
+}
+
+struct CricketBoardSection: View {
+    let players: [Player]
+    let activePlayerIndex: Int
+    let targets: [CricketTarget]
+    let marks: (Player, CricketTarget) -> Int
+    let score: (Player) -> Int
+    let throwsToDisplay: (Player, Int) -> [Int]
+
+    private var activePlayerID: UUID? {
+        guard players.indices.contains(activePlayerIndex) else { return nil }
+        return players[activePlayerIndex].id
+    }
+
+    private var activeThrowSignature: String {
+        guard players.indices.contains(activePlayerIndex) else { return "" }
+        return throwsToDisplay(players[activePlayerIndex], activePlayerIndex)
+            .map(String.init)
+            .joined(separator: "-")
+    }
+
+    private func visitLabel(for values: [Int]) -> String {
+        guard !values.isEmpty else { return "No throw" }
+        return values.map(String.init).joined(separator: " ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 0) {
+                Color.clear
+                    .frame(width: 42, height: 1)
+
+                ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(player.name)
+                            .font(.caption.weight(index == activePlayerIndex ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Text("\(score(player))")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+
+            ForEach(targets) { target in
+                HStack(spacing: 0) {
+                    Text(target.label)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 42, alignment: .leading)
+
+                    ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+                        Text("\(marks(player, target))")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 28)
+                            .padding(.vertical, 6)
+                            .background(
+                                index == activePlayerIndex
+                                    ? (player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor).opacity(0.16)
+                                    : Color(.secondarySystemBackground)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            Divider()
+                .padding(.top, 4)
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
+                            let throwsForBadge = throwsToDisplay(player, index)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(player.name)
+                                    .font(.caption.weight(index == activePlayerIndex ? .semibold : .regular))
+                                    .foregroundStyle(index == activePlayerIndex ? .primary : .secondary)
+                                    .lineLimit(1)
+                                Text(visitLabel(for: throwsForBadge))
+                                    .font(.caption.monospacedDigit())
+                                    .lineLimit(1)
+                                    .foregroundStyle(throwsForBadge.isEmpty ? .secondary : .primary)
+                            }
+                            .frame(width: 96, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(
+                                index == activePlayerIndex
+                                    ? Color.accentColor.opacity(0.10)
+                                    : Color(.tertiarySystemBackground)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .id(player.id)
+                        }
+                    }
+                }
+                .onAppear {
+                    guard let activePlayerID else { return }
+                    proxy.scrollTo(activePlayerID, anchor: .center)
+                }
+                .onChange(of: activePlayerID) { _, newValue in
+                    guard let newValue else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
+                }
+                .onChange(of: activeThrowSignature) { _, _ in
+                    guard let activePlayerID else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(activePlayerID, anchor: .center)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
 struct GameControlBar: View {
     let sessionRole: SessionRole
     let isLegInProgress: Bool
@@ -172,6 +302,19 @@ struct CheckoutBadgeView: View {
     }
 }
 
+struct ScoreEntryModePicker: View {
+    @Binding var selection: ScoreEntryMode
+
+    var body: some View {
+        Picker("Input Mode", selection: $selection) {
+            ForEach(ScoreEntryMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+}
+
 struct MultiplierPickerView: View {
     @Binding var selection: DartMultiplier
 
@@ -183,6 +326,84 @@ struct MultiplierPickerView: View {
                 }
             }
             .pickerStyle(.segmented)
+        }
+    }
+}
+
+struct QuickScorePadView: View {
+    @Binding var scoreText: String
+    @Binding var isShowingManualInput: Bool
+    let isInputLocked: Bool
+    let hasWinner: Bool
+    let isVisitOpenInThrowsMode: Bool
+    let onQuickScoreTap: (Int) -> Void
+    let onSubmitManualScore: () -> Void
+    let onNoScoreTap: () -> Void
+
+    private let primaryQuickScores = [60, 100, 140, 180]
+    private let secondaryQuickScores = [26, 45, 85, 90, 120, 121]
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+
+    private var isDisabled: Bool {
+        hasWinner || isInputLocked || isVisitOpenInThrowsMode
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(primaryQuickScores, id: \.self) { score in
+                    Button("\(score)") {
+                        onQuickScoreTap(score)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    .disabled(isDisabled)
+                }
+            }
+
+            LazyVGrid(columns: gridColumns, spacing: 8) {
+                ForEach(secondaryQuickScores, id: \.self) { score in
+                    Button("\(score)") {
+                        onQuickScoreTap(score)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+                    .disabled(isDisabled)
+                }
+
+                Button("•••") {
+                    isShowingManualInput.toggle()
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                .disabled(hasWinner || isInputLocked)
+
+                Button {
+                    onNoScoreTap()
+                } label: {
+                    Text("No Score")
+                        .font(.footnote)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+                .disabled(hasWinner || isInputLocked)
+            }
+
+            if isShowingManualInput {
+                TextField("Enter score", text: $scoreText)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(isDisabled)
+                    .onSubmit(onSubmitManualScore)
+            }
+
+            if isVisitOpenInThrowsMode {
+                Text("Finish the current visit in Throws mode.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }

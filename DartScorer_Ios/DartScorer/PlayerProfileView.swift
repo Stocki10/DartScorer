@@ -87,6 +87,11 @@ struct ProfileEditView: View {
     @State private var name: String
     @State private var color: Color
 
+    private let statsColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     init(store: PlayerProfileStore, profile: PlayerProfile?) {
         self.store = store
         self.profile = profile
@@ -109,24 +114,42 @@ struct ProfileEditView: View {
 
                 if isEditing, let stats = profile?.stats, stats.gamesPlayed > 0 {
                     Section("Stats") {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 24) {
-                                statCell(label: "Games", value: "\(stats.gamesPlayed)")
-                                statCell(label: "Wins", value: "\(stats.gamesWon)")
-                                if let rate = stats.winRate {
-                                    statCell(label: "Win Rate", value: "\(Int(rate * 100))%")
-                                }
-                                if let avg = stats.legAverage {
-                                    statCell(label: "Average", value: String(format: "%.1f", avg))
-                                }
-                                if stats.highestTurnScore > 0 {
-                                    statCell(label: "Best Turn", value: "\(stats.highestTurnScore)")
-                                }
-                                if stats.highestCheckout > 0 {
-                                    statCell(label: "Best Checkout", value: "\(stats.highestCheckout)")
-                                }
+                        statGroup(title: "Overview") {
+                            statCard(label: "Games", value: "\(stats.gamesPlayed)")
+                            statCard(label: "Wins", value: "\(stats.gamesWon)")
+                            if let rate = stats.winRate {
+                                statCard(label: "Win Rate", value: "\(Int(rate * 100))%")
                             }
-                            .padding(.vertical, 4)
+                            if let avg = stats.legAverage {
+                                statCard(label: "Average", value: String(format: "%.1f", avg))
+                            }
+                        }
+
+                        statGroup(title: "Scoring") {
+                            if let firstNineAverage = stats.firstNineAverage {
+                                statCard(label: "First 9 Avg", value: String(format: "%.1f", firstNineAverage))
+                            }
+                            if stats.highestTurnScore > 0 {
+                                statCard(label: "Best Turn", value: "\(stats.highestTurnScore)")
+                            }
+                            if stats.highestScore > 0 {
+                                statCard(label: "Highest Score", value: "\(stats.highestScore)")
+                            }
+                            if stats.score180Count > 0 {
+                                statCard(label: "180 Count", value: "\(stats.score180Count)")
+                            }
+                            if stats.score140PlusCount > 0 {
+                                statCard(label: "140+ Count", value: "\(stats.score140PlusCount)")
+                            }
+                        }
+
+                        statGroup(title: "Finishing") {
+                            if let checkoutPercentage = stats.checkoutPercentage {
+                                statCard(label: "Checkout %", value: "\(Int(checkoutPercentage * 100))%")
+                            }
+                            if stats.highestCheckout > 0 {
+                                statCard(label: "Best Checkout", value: "\(stats.highestCheckout)")
+                            }
                         }
                     }
                 }
@@ -145,14 +168,34 @@ struct ProfileEditView: View {
         }
     }
 
-    private func statCell(label: String, value: String) -> some View {
-        VStack(spacing: 2) {
+    private func statCard(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .fontWeight(.semibold)
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func statGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            LazyVGrid(columns: statsColumns, spacing: 12) {
+                content()
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private func save() {

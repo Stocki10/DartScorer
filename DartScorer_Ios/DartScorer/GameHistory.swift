@@ -40,13 +40,18 @@ struct LegPlayerResult: Identifiable, Codable {
     let pointsScored: Int
     let average: Double
     let firstNineAverage: Double?
+    let firstNinePoints: Int
+    let firstNineDarts: Int
     let highestFinish: Int
     let highestTurnScore: Int
     let bustCount: Int
+    let checkoutAttempts: Int
+    let checkoutHits: Int
 
     enum CodingKeys: String, CodingKey {
         case playerID, name, dartsThrown, pointsScored, average
-        case firstNineAverage, highestFinish, highestTurnScore, bustCount
+        case firstNineAverage, firstNinePoints, firstNineDarts
+        case highestFinish, highestTurnScore, bustCount, checkoutAttempts, checkoutHits
     }
 
     init(
@@ -56,9 +61,13 @@ struct LegPlayerResult: Identifiable, Codable {
         pointsScored: Int,
         average: Double,
         firstNineAverage: Double?,
+        firstNinePoints: Int,
+        firstNineDarts: Int,
         highestFinish: Int,
         highestTurnScore: Int,
-        bustCount: Int
+        bustCount: Int,
+        checkoutAttempts: Int,
+        checkoutHits: Int
     ) {
         self.id = playerID
         self.playerID = playerID
@@ -67,9 +76,13 @@ struct LegPlayerResult: Identifiable, Codable {
         self.pointsScored = pointsScored
         self.average = average
         self.firstNineAverage = firstNineAverage
+        self.firstNinePoints = firstNinePoints
+        self.firstNineDarts = firstNineDarts
         self.highestFinish = highestFinish
         self.highestTurnScore = highestTurnScore
         self.bustCount = bustCount
+        self.checkoutAttempts = checkoutAttempts
+        self.checkoutHits = checkoutHits
     }
 
     init(from decoder: Decoder) throws {
@@ -82,9 +95,13 @@ struct LegPlayerResult: Identifiable, Codable {
         pointsScored = (try? c.decode(Int.self, forKey: .pointsScored)) ?? 0
         average = (try? c.decode(Double.self, forKey: .average)) ?? 0.0
         firstNineAverage = try? c.decode(Double.self, forKey: .firstNineAverage)
+        firstNinePoints = (try? c.decode(Int.self, forKey: .firstNinePoints)) ?? 0
+        firstNineDarts = (try? c.decode(Int.self, forKey: .firstNineDarts)) ?? 0
         highestFinish = (try? c.decode(Int.self, forKey: .highestFinish)) ?? 0
         highestTurnScore = (try? c.decode(Int.self, forKey: .highestTurnScore)) ?? 0
         bustCount = (try? c.decode(Int.self, forKey: .bustCount)) ?? 0
+        checkoutAttempts = (try? c.decode(Int.self, forKey: .checkoutAttempts)) ?? 0
+        checkoutHits = (try? c.decode(Int.self, forKey: .checkoutHits)) ?? 0
     }
 }
 
@@ -139,19 +156,29 @@ struct PlayerGameResult: Identifiable {
     let id: UUID
     let name: String
     let average: Double
+    let firstNineAverage: Double?
     let highestTurnScore: Int
+    let highestScore: Int
     let checkoutPercentage: Double?
+    let checkoutAttempts: Int
+    let checkoutHits: Int
     let isWinner: Bool
     let profileID: UUID?
     let totalDartsThrown: Int
     let totalPointsScored: Int
     let highestCheckout: Int
+    let score180Count: Int
+    let score140PlusCount: Int
+    let totalFirstNinePoints: Int
+    let totalFirstNineDarts: Int
 }
 
 extension PlayerGameResult: Codable {
     enum CodingKeys: String, CodingKey {
-        case id, name, average, highestTurnScore, checkoutPercentage, isWinner
+        case id, name, average, firstNineAverage, highestTurnScore, highestScore
+        case checkoutPercentage, checkoutAttempts, checkoutHits, isWinner
         case profileID, totalDartsThrown, totalPointsScored, highestCheckout
+        case score180Count, score140PlusCount, totalFirstNinePoints, totalFirstNineDarts
     }
 
     init(from decoder: Decoder) throws {
@@ -159,13 +186,21 @@ extension PlayerGameResult: Codable {
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         average = try c.decode(Double.self, forKey: .average)
+        firstNineAverage = try? c.decode(Double.self, forKey: .firstNineAverage)
         highestTurnScore = try c.decode(Int.self, forKey: .highestTurnScore)
+        highestScore = (try? c.decode(Int.self, forKey: .highestScore)) ?? highestTurnScore
         checkoutPercentage = try? c.decode(Double.self, forKey: .checkoutPercentage)
+        checkoutAttempts = (try? c.decode(Int.self, forKey: .checkoutAttempts)) ?? 0
+        checkoutHits = (try? c.decode(Int.self, forKey: .checkoutHits)) ?? 0
         isWinner = try c.decode(Bool.self, forKey: .isWinner)
         profileID = try? c.decode(UUID.self, forKey: .profileID)
         totalDartsThrown = (try? c.decode(Int.self, forKey: .totalDartsThrown)) ?? 0
         totalPointsScored = (try? c.decode(Int.self, forKey: .totalPointsScored)) ?? 0
         highestCheckout = (try? c.decode(Int.self, forKey: .highestCheckout)) ?? 0
+        score180Count = (try? c.decode(Int.self, forKey: .score180Count)) ?? 0
+        score140PlusCount = (try? c.decode(Int.self, forKey: .score140PlusCount)) ?? 0
+        totalFirstNinePoints = (try? c.decode(Int.self, forKey: .totalFirstNinePoints)) ?? 0
+        totalFirstNineDarts = (try? c.decode(Int.self, forKey: .totalFirstNineDarts)) ?? 0
     }
 }
 

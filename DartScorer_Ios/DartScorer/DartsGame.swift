@@ -4,8 +4,25 @@ import Combine
 enum GameMode: String, CaseIterable, Identifiable, Codable {
     case x01 = "X01"
     case practice = "Practice"
+    case cricket = "Cricket"
 
     var id: String { rawValue }
+}
+
+enum CricketTarget: Int, CaseIterable, Identifiable, Codable {
+    case twenty = 20
+    case nineteen = 19
+    case eighteen = 18
+    case seventeen = 17
+    case sixteen = 16
+    case fifteen = 15
+    case bull = 25
+
+    var id: Int { rawValue }
+
+    var label: String {
+        self == .bull ? "Bull" : "\(rawValue)"
+    }
 }
 
 enum FinishRule: String, CaseIterable, Identifiable, Codable {
@@ -56,6 +73,8 @@ final class DartsGame: ObservableObject {
     @Published private(set) var checkoutOpportunitiesByPlayerID: [UUID: Int] = [:]
     @Published private(set) var checkoutConversionsByPlayerID: [UUID: Int] = [:]
     @Published private(set) var highestCheckoutByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var cricketMarksByPlayerID: [UUID: [CricketTarget: Int]] = [:]
+    @Published private(set) var cricketScoreByPlayerID: [UUID: Int] = [:]
 
     private var history: [GameSnapshot] = []
     private var completedLegs: [LegRecord] = []
@@ -73,9 +92,9 @@ final class DartsGame: ObservableObject {
         setModeEnabled: Bool = false,
         legsToWin: Int = 3
     ) {
-        let minimumPlayers = gameMode == .practice ? 1 : 2
+        let minimumPlayers = gameMode == .x01 ? 2 : 1
         let clampedCount = min(max(minimumPlayers, playerCount), 5)
-        let initialScore = gameMode == .practice ? 0 : startingScore
+        let initialScore = gameMode == .x01 ? startingScore : 0
         self.gameMode = gameMode
         self.startingScore = initialScore
         self.finishRule = finishRule
@@ -125,12 +144,36 @@ final class DartsGame: ObservableObject {
 
     var isLegInProgress: Bool {
         guard winner == nil else { return false }
+        if gameMode == .cricket {
+            return cricketMarksByPlayerID.values.contains { marks in
+                marks.values.contains { $0 > 0 }
+            }
+        }
         return dartsThrownByPlayerID.values.contains { $0 > 0 }
+    }
+
+    var cricketTargets: [CricketTarget] {
+        CricketTarget.allCases
+    }
+
+    func cricketMarks(for player: Player, target: CricketTarget) -> Int {
+        cricketMarksByPlayerID[player.id]?[target] ?? 0
+    }
+
+    func cricketScore(for player: Player) -> Int {
+        cricketScoreByPlayerID[player.id] ?? 0
+    }
+
+    func allCricketTargetsClosed(for player: Player) -> Bool {
+        cricketTargets.allSatisfy { cricketMarks(for: player, target: $0) >= 3 }
     }
 
     func submitThrow(segment: DartSegment, multiplier: DartMultiplier) {
         if gameMode == .practice {
             submitPracticeThrow(segment: segment, multiplier: multiplier)
+            return
+        } else if gameMode == .cricket {
+            submitCricketThrow(segment: segment, multiplier: multiplier)
             return
         }
         guard winner == nil else { return }
@@ -206,6 +249,89 @@ final class DartsGame: ObservableObject {
         }
     }
 
+    func submitQuickScore(_ score: Int) {
+        if gameMode == .practice {
+            submitPracticeQuickScore(score)
+            return
+        }
+
+        guard gameMode == .x01 else {
+            statusMessage = "Quick score is unavailable in Cricket."
+            return
+        }
+        guard winner == nil else { return }
+        guard currentTurn.dartsUsed == 0 else {
+            statusMessage = "Finish the current visit in Throws mode."
+            return
+        }
+        guard (1...180).contains(score) else {
+            statusMessage = "Quick scores must be between 1 and 180."
+            return
+        }
+        guard !(inRule == .doubleIn && currentTurn.openedAtTurnStart == false) else {
+            statusMessage = "Finish the opening double in Throws mode."
+            return
+        }
+
+        recordSnapshot()
+        statusMessage = nil
+
+        let player = activePlayer
+        let proposedScore = player.score - score
+        let checkoutRoute = proposedScore == 0 ? bestPossibleFinishLine : nil
+        let checkoutDartsUsed = checkoutRoute.map(Self.dartCountForCheckoutRoute)
+        let dartsUsed = checkoutDartsUsed ?? 3
+
+        lastTurnThrowsByPlayerID[player.id] = [score]
+
+        if proposedScore < 0 || (finishRule == .doubleOut && proposedScore == 1) || (proposedScore == 0 && checkoutRoute == nil) {
+            recordDartsThrown(count: 3, for: player.id)
+            appendQuickScoredDartPoints(0, dartsUsed: 3, for: player.id)
+            handleBust(for: player)
+            return
+        }
+
+        recordDartsThrown(count: dartsUsed, for: player.id)
+        appendQuickScoredDartPoints(score, dartsUsed: dartsUsed, for: player.id)
+        addScoredPoints(score, for: player.id)
+
+        var updatedPlayers = players
+        updatedPlayers[activePlayerIndex].score = proposedScore
+        players = updatedPlayers
+
+        if proposedScore == 0 {
+            let winningPlayer = players[activePlayerIndex]
+            let checkoutScore = currentTurn.startingScore
+            updateHighestTurnScore(for: winningPlayer.id, score: checkoutScore)
+            highestCheckoutByPlayerID[winningPlayer.id] = max(highestCheckoutByPlayerID[winningPlayer.id] ?? 0, checkoutScore)
+            checkoutConversionsByPlayerID[winningPlayer.id, default: 0] += 1
+            recordVisit(for: winningPlayer.id, score: checkoutScore, isBust: false)
+            recordCompletedLeg(
+                winner: winningPlayer,
+                checkoutScore: checkoutScore,
+                checkoutRoute: checkoutRoute
+            )
+            if setModeEnabled {
+                legsWonByPlayerID[winningPlayer.id, default: 0] += 1
+                if (legsWonByPlayerID[winningPlayer.id] ?? 0) >= legsToWin {
+                    winner = winningPlayer
+                    setWinner = winningPlayer
+                    statusMessage = "\(winningPlayer.name) wins the set."
+                } else {
+                    startNewLeg(randomSequence: false, invertedSequence: true)
+                }
+            } else {
+                winner = winningPlayer
+                statusMessage = "\(winningPlayer.name) wins the leg."
+            }
+            return
+        }
+
+        updateHighestTurnScore(for: player.id, score: score)
+        recordVisit(for: player.id, score: score, isBust: false)
+        endTurn()
+    }
+
     func restartLeg() {
         startNewLeg(randomSequence: false, invertedSequence: false)
     }
@@ -245,7 +371,7 @@ final class DartsGame: ObservableObject {
         lastTurnThrowsByPlayerID.removeAll()
         let preparedNames = sanitizeAndClampNames(playerNames, for: gameMode)
         self.gameMode = gameMode
-        self.startingScore = gameMode == .practice ? 0 : startingScore
+        self.startingScore = gameMode == .x01 ? startingScore : 0
         self.finishRule = finishRule
         self.inRule = inRule
         self.setModeEnabled = gameMode == .x01 ? setModeEnabled : false
@@ -292,7 +418,7 @@ final class DartsGame: ObservableObject {
         currentLegStartingPlayerID = nil
         lastTurnThrowsByPlayerID.removeAll()
         self.gameMode = gameMode
-        self.startingScore = gameMode == .practice ? 0 : startingScore
+        self.startingScore = gameMode == .x01 ? startingScore : 0
         self.finishRule = finishRule
         self.inRule = inRule
         self.setModeEnabled = gameMode == .x01 ? setModeEnabled : false
@@ -318,7 +444,8 @@ final class DartsGame: ObservableObject {
     }
 
     func newGame(playerCount: Int) {
-        let clampedCount = min(max(2, playerCount), 5)
+        let minimumPlayers = gameMode == .x01 ? 2 : 1
+        let clampedCount = min(max(minimumPlayers, playerCount), 5)
         let names = (1...clampedCount).map { index in
             players.indices.contains(index - 1) ? players[index - 1].name : "Player \(index)"
         }
@@ -362,6 +489,8 @@ final class DartsGame: ObservableObject {
         checkoutOpportunitiesByPlayerID = previous.checkoutOpportunitiesByPlayerID
         checkoutConversionsByPlayerID = previous.checkoutConversionsByPlayerID
         highestCheckoutByPlayerID = previous.highestCheckoutByPlayerID
+        cricketMarksByPlayerID = previous.cricketMarksByPlayerID
+        cricketScoreByPlayerID = previous.cricketScoreByPlayerID
         completedLegs = previous.completedLegs
         currentLegStartingPlayerID = previous.currentLegStartingPlayerID
         scoredDartPointsHistoryByPlayerID = previous.scoredDartPointsHistoryByPlayerID
@@ -376,7 +505,9 @@ final class DartsGame: ObservableObject {
     func legAverage(for player: Player) -> Double? {
         let darts = dartsThrownByPlayerID[player.id] ?? 0
         guard darts > 0 else { return nil }
-        let points = pointsScoredByPlayerID[player.id] ?? 0
+        let points = gameMode == .cricket
+            ? (cricketScoreByPlayerID[player.id] ?? 0)
+            : (pointsScoredByPlayerID[player.id] ?? 0)
         return (Double(points) / Double(darts)) * 3.0
     }
 
@@ -386,32 +517,71 @@ final class DartsGame: ObservableObject {
 
     func buildGameRecord() -> GameRecord {
         let results = players.map { player in
-            let darts = dartsThrownByPlayerID[player.id] ?? 0
-            let points = pointsScoredByPlayerID[player.id] ?? 0
+            let legResults = completedLegs.compactMap { leg in
+                leg.playerResults.first { $0.playerID == player.id }
+            }
+            let legVisits = completedLegs.flatMap { leg in
+                leg.playerVisits.filter { $0.playerID == player.id }
+            }
+
+            let darts = legResults.isEmpty
+                ? (dartsThrownByPlayerID[player.id] ?? 0)
+                : legResults.reduce(0) { $0 + $1.dartsThrown }
+            let points = legResults.isEmpty
+                ? (gameMode == .cricket
+                    ? (cricketScoreByPlayerID[player.id] ?? 0)
+                    : (pointsScoredByPlayerID[player.id] ?? 0))
+                : legResults.reduce(0) { $0 + $1.pointsScored }
             let avg = darts > 0 ? (Double(points) / Double(darts)) * 3.0 : 0.0
-            let highest = highestTurnScoreByPlayerID[player.id] ?? 0
-            let opportunities = checkoutOpportunitiesByPlayerID[player.id] ?? 0
-            let conversions = checkoutConversionsByPlayerID[player.id] ?? 0
+            let highest = legResults.isEmpty
+                ? (highestTurnScoreByPlayerID[player.id] ?? 0)
+                : legResults.reduce(0) { max($0, $1.highestTurnScore) }
+            let highestScore = legVisits.isEmpty
+                ? highest
+                : legVisits.reduce(0) { max($0, $1.score) }
+            let opportunities = legResults.isEmpty
+                ? (checkoutOpportunitiesByPlayerID[player.id] ?? 0)
+                : legResults.reduce(0) { $0 + $1.checkoutAttempts }
+            let conversions = legResults.isEmpty
+                ? (checkoutConversionsByPlayerID[player.id] ?? 0)
+                : legResults.reduce(0) { $0 + $1.checkoutHits }
             let checkoutPct: Double? = opportunities > 0 ? Double(conversions) / Double(opportunities) : nil
-            let highestCheckout = highestCheckoutByPlayerID[player.id] ?? 0
+            let highestCheckout = legResults.isEmpty
+                ? (highestCheckoutByPlayerID[player.id] ?? 0)
+                : legResults.reduce(0) { max($0, $1.highestFinish) }
+            let totalFirstNinePoints = legResults.reduce(0) { $0 + $1.firstNinePoints }
+            let totalFirstNineDarts = legResults.reduce(0) { $0 + $1.firstNineDarts }
+            let firstNineAverage = totalFirstNineDarts > 0
+                ? (Double(totalFirstNinePoints) / Double(totalFirstNineDarts)) * 3.0
+                : nil
+            let score180Count = legVisits.filter { !$0.isBust && $0.score == 180 }.count
+            let score140PlusCount = legVisits.filter { !$0.isBust && $0.score >= 140 && $0.score < 180 }.count
             return PlayerGameResult(
                 id: player.id,
                 name: player.name,
                 average: avg,
+                firstNineAverage: firstNineAverage,
                 highestTurnScore: highest,
+                highestScore: highestScore,
                 checkoutPercentage: checkoutPct,
+                checkoutAttempts: opportunities,
+                checkoutHits: conversions,
                 isWinner: winner?.id == player.id,
                 profileID: player.profileID,
                 totalDartsThrown: darts,
                 totalPointsScored: points,
-                highestCheckout: highestCheckout
+                highestCheckout: highestCheckout,
+                score180Count: score180Count,
+                score140PlusCount: score140PlusCount,
+                totalFirstNinePoints: totalFirstNinePoints,
+                totalFirstNineDarts: totalFirstNineDarts
             )
         }
         return GameRecord(
             id: UUID(),
             date: Date(),
             startingScore: startingScore,
-            finishRule: gameMode == .practice ? gameMode.rawValue : finishRule.rawValue,
+            finishRule: gameMode == .x01 ? finishRule.rawValue : gameMode.rawValue,
             playerResults: results,
             legs: completedLegs
         )
@@ -636,7 +806,9 @@ extension DartsGame {
             highestTurnScoreByPlayerID: highestTurnScoreByPlayerID.stringKeyed,
             checkoutOpportunitiesByPlayerID: checkoutOpportunitiesByPlayerID.stringKeyed,
             checkoutConversionsByPlayerID: checkoutConversionsByPlayerID.stringKeyed,
-            highestCheckoutByPlayerID: highestCheckoutByPlayerID.stringKeyed
+            highestCheckoutByPlayerID: highestCheckoutByPlayerID.stringKeyed,
+            cricketMarksByPlayerID: cricketMarksByPlayerID.stringKeyedCricketMarks,
+            cricketScoreByPlayerID: cricketScoreByPlayerID.stringKeyed
         )
     }
 
@@ -663,6 +835,8 @@ extension DartsGame {
         checkoutOpportunitiesByPlayerID = state.checkoutOpportunitiesByPlayerID.uuidKeyed()
         checkoutConversionsByPlayerID = state.checkoutConversionsByPlayerID.uuidKeyed()
         highestCheckoutByPlayerID = state.highestCheckoutByPlayerID.uuidKeyed()
+        cricketMarksByPlayerID = state.cricketMarksByPlayerID.uuidKeyedCricketMarks()
+        cricketScoreByPlayerID = state.cricketScoreByPlayerID.uuidKeyed()
         completedLegs = []
         currentLegStartingPlayerID = players.first?.id
         scoredDartPointsHistoryByPlayerID = [:]
@@ -691,6 +865,8 @@ private struct GameSnapshot {
     let checkoutOpportunitiesByPlayerID: [UUID: Int]
     let checkoutConversionsByPlayerID: [UUID: Int]
     let highestCheckoutByPlayerID: [UUID: Int]
+    let cricketMarksByPlayerID: [UUID: [CricketTarget: Int]]
+    let cricketScoreByPlayerID: [UUID: Int]
     let completedLegs: [LegRecord]
     let currentLegStartingPlayerID: UUID?
     let scoredDartPointsHistoryByPlayerID: [UUID: [Int]]
@@ -706,7 +882,7 @@ private extension DartsGame {
             return trimmed.isEmpty ? "Player \(index + 1)" : trimmed
         }
         if withFallbacks.isEmpty {
-            return gameMode == .practice ? ["Player 1"] : ["Player 1", "Player 2"]
+            return gameMode == .x01 ? ["Player 1", "Player 2"] : ["Player 1"]
         }
         if withFallbacks.count == 1, gameMode == .x01 {
             return withFallbacks + ["Player 2"]
@@ -736,6 +912,8 @@ private extension DartsGame {
                 checkoutOpportunitiesByPlayerID: checkoutOpportunitiesByPlayerID,
                 checkoutConversionsByPlayerID: checkoutConversionsByPlayerID,
                 highestCheckoutByPlayerID: highestCheckoutByPlayerID,
+                cricketMarksByPlayerID: cricketMarksByPlayerID,
+                cricketScoreByPlayerID: cricketScoreByPlayerID,
                 completedLegs: completedLegs,
                 currentLegStartingPlayerID: currentLegStartingPlayerID,
                 scoredDartPointsHistoryByPlayerID: scoredDartPointsHistoryByPlayerID,
@@ -764,6 +942,8 @@ private extension DartsGame {
         scoredDartPointsHistoryByPlayerID = [:]
         bustCountByPlayerID = [:]
         currentLegVisitsByPlayerID = [:]
+        cricketMarksByPlayerID = [:]
+        cricketScoreByPlayerID = [:]
         for player in players {
             pointsScoredByPlayerID[player.id] = 0
             dartsThrownByPlayerID[player.id] = 0
@@ -774,11 +954,18 @@ private extension DartsGame {
             scoredDartPointsHistoryByPlayerID[player.id] = []
             bustCountByPlayerID[player.id] = 0
             currentLegVisitsByPlayerID[player.id] = []
+            cricketMarksByPlayerID[player.id] = Dictionary(uniqueKeysWithValues: cricketTargets.map { ($0, 0) })
+            cricketScoreByPlayerID[player.id] = 0
         }
     }
 
     func recordDartThrown(for playerID: UUID) {
         dartsThrownByPlayerID[playerID, default: 0] += 1
+    }
+
+    func recordDartsThrown(count: Int, for playerID: UUID) {
+        guard count > 0 else { return }
+        dartsThrownByPlayerID[playerID, default: 0] += count
     }
 
     func addScoredPoints(_ points: Int, for playerID: UUID) {
@@ -806,6 +993,16 @@ private extension DartsGame {
 
     func appendScoredDartPoints(_ points: Int, for playerID: UUID) {
         scoredDartPointsHistoryByPlayerID[playerID, default: []].append(points)
+    }
+
+    func appendQuickScoredDartPoints(_ score: Int, dartsUsed: Int, for playerID: UUID) {
+        guard dartsUsed > 0 else { return }
+        appendScoredDartPoints(score, for: playerID)
+        if dartsUsed > 1 {
+            for _ in 1..<dartsUsed {
+                appendScoredDartPoints(0, for: playerID)
+            }
+        }
     }
 
     func recordVisit(for playerID: UUID, score: Int, isBust: Bool) {
@@ -857,9 +1054,9 @@ private extension DartsGame {
             let average = darts > 0 ? (Double(points) / Double(darts)) * 3.0 : 0.0
             let firstNineHistory = scoredDartPointsHistoryByPlayerID[player.id] ?? []
             let firstNineDarts = min(firstNineHistory.count, 9)
+            let firstNinePoints = firstNineHistory.prefix(firstNineDarts).reduce(0, +)
             let firstNineAverage: Double?
             if firstNineDarts > 0 {
-                let firstNinePoints = firstNineHistory.prefix(firstNineDarts).reduce(0, +)
                 firstNineAverage = (Double(firstNinePoints) / Double(firstNineDarts)) * 3.0
             } else {
                 firstNineAverage = nil
@@ -872,9 +1069,13 @@ private extension DartsGame {
                 pointsScored: points,
                 average: average,
                 firstNineAverage: firstNineAverage,
+                firstNinePoints: firstNinePoints,
+                firstNineDarts: firstNineDarts,
                 highestFinish: highestCheckoutByPlayerID[player.id] ?? 0,
                 highestTurnScore: highestTurnScoreByPlayerID[player.id] ?? 0,
-                bustCount: bustCountByPlayerID[player.id] ?? 0
+                bustCount: bustCountByPlayerID[player.id] ?? 0,
+                checkoutAttempts: checkoutOpportunitiesByPlayerID[player.id] ?? 0,
+                checkoutHits: checkoutConversionsByPlayerID[player.id] ?? 0
             )
         }
 
@@ -920,5 +1121,120 @@ private extension DartsGame {
             recordVisit(for: player.id, score: turnScore, isBust: false)
             endTurn()
         }
+    }
+
+    func submitPracticeQuickScore(_ score: Int) {
+        guard winner == nil else { return }
+        guard currentTurn.dartsUsed == 0 else {
+            statusMessage = "Finish the current visit in Throws mode."
+            return
+        }
+        guard (1...180).contains(score) else {
+            statusMessage = "Quick scores must be between 1 and 180."
+            return
+        }
+
+        recordSnapshot()
+        statusMessage = "Practice mode"
+
+        let player = activePlayer
+        lastTurnThrowsByPlayerID[player.id] = [score]
+        recordDartsThrown(count: 3, for: player.id)
+        appendQuickScoredDartPoints(score, dartsUsed: 3, for: player.id)
+        addScoredPoints(score, for: player.id)
+
+        var updatedPlayers = players
+        updatedPlayers[activePlayerIndex].score += score
+        players = updatedPlayers
+
+        updateHighestTurnScore(for: player.id, score: score)
+        recordVisit(for: player.id, score: score, isBust: false)
+        endTurn()
+    }
+
+    func submitCricketThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        guard winner == nil else { return }
+        guard remainingDarts > 0 else { return }
+
+        guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
+            statusMessage = "Invalid throw."
+            return
+        }
+
+        recordSnapshot()
+        statusMessage = "Close all numbers and finish level or ahead."
+
+        let player = activePlayer
+        appendThrowToHistory(playerID: player.id, points: throwValue.points)
+        recordDartThrown(for: player.id)
+        currentTurn.darts.append(throwValue)
+
+        let scoredPoints = applyCricketThrow(throwValue, for: player.id)
+        appendScoredDartPoints(scoredPoints, for: player.id)
+        addScoredPoints(scoredPoints, for: player.id)
+
+        if currentTurn.dartsUsed == 3 {
+            let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+            updateHighestTurnScore(for: player.id, score: turnScore)
+            recordVisit(for: player.id, score: turnScore, isBust: false)
+            endTurn()
+        }
+
+        if let winningPlayer = cricketWinningPlayer() {
+            recordCompletedLeg(winner: winningPlayer, checkoutScore: nil, checkoutRoute: nil)
+            winner = winningPlayer
+            setWinner = winningPlayer
+            statusMessage = "\(winningPlayer.name) wins Cricket."
+        }
+    }
+
+    func applyCricketThrow(_ throwValue: DartThrow, for playerID: UUID) -> Int {
+        guard let target = cricketTarget(for: throwValue.segment) else { return 0 }
+        let marks = cricketMarksEarned(for: throwValue)
+        let currentMarks = cricketMarksByPlayerID[playerID]?[target] ?? 0
+        let scoredPoints = cricketScoringValue(for: throwValue, playerID: playerID)
+        cricketMarksByPlayerID[playerID]?[target] = min(3, currentMarks + marks)
+        cricketScoreByPlayerID[playerID, default: 0] += scoredPoints
+        return scoredPoints
+    }
+
+    func cricketScoringValue(for throwValue: DartThrow, playerID: UUID) -> Int {
+        guard let target = cricketTarget(for: throwValue.segment) else { return 0 }
+        let marks = cricketMarksEarned(for: throwValue)
+        let currentMarks = cricketMarksByPlayerID[playerID]?[target] ?? 0
+        let overflow = max(0, currentMarks + marks - 3)
+        let opponentsOpen = players
+            .filter { $0.id != playerID }
+            .contains { (cricketMarksByPlayerID[$0.id]?[target] ?? 0) < 3 }
+        return opponentsOpen ? overflow * target.rawValue : 0
+    }
+
+    func cricketMarksEarned(for throwValue: DartThrow) -> Int {
+        switch throwValue.segment {
+        case .bull:
+            return throwValue.multiplier.rawValue
+        case .number:
+            return throwValue.multiplier.rawValue
+        }
+    }
+
+    func cricketTarget(for segment: DartSegment) -> CricketTarget? {
+        switch segment {
+        case .bull:
+            return .bull
+        case .number(let value):
+            return CricketTarget(rawValue: value)
+        }
+    }
+
+    func cricketWinningPlayer() -> Player? {
+        players.first { player in
+            allCricketTargetsClosed(for: player) &&
+            players.allSatisfy { cricketScore(for: player) >= cricketScore(for: $0) }
+        }
+    }
+
+    nonisolated private static func dartCountForCheckoutRoute(_ route: String) -> Int {
+        route.split(separator: " ").count
     }
 }

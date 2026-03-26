@@ -65,6 +65,8 @@ struct NetworkGameState: Codable {
     let checkoutOpportunitiesByPlayerID: [String: Int]
     let checkoutConversionsByPlayerID: [String: Int]
     let highestCheckoutByPlayerID: [String: Int]
+    let cricketMarksByPlayerID: [String: [String: Int]]
+    let cricketScoreByPlayerID: [String: Int]
 }
 
 // MARK: - Session Config (broadcast from host to all peers)
@@ -85,6 +87,12 @@ struct ScoreUpdatePayload: Codable {
     let turnSequence: Int
 }
 
+struct QuickScoreUpdatePayload: Codable {
+    let playerID: String
+    let score: Int
+    let turnSequence: Int
+}
+
 struct PlayerAssignmentPayload: Codable {
     let deviceID: String
     let playerIDs: [String]
@@ -99,6 +107,7 @@ struct TurnLockPayload: Codable {
 
 enum MultiplayerMessage: Codable {
     case scoreUpdate(ScoreUpdatePayload)
+    case quickScoreUpdate(QuickScoreUpdatePayload)
     case undoRequest(deviceID: String)
     case gameState(NetworkGameState)
     case sessionConfig(SessionConfig)
@@ -112,7 +121,7 @@ enum MultiplayerMessage: Codable {
     private enum CodingKeys: String, CodingKey { case type, payload }
 
     private enum Tag: String, Codable {
-        case scoreUpdate, undoRequest, gameState, sessionConfig
+        case scoreUpdate, quickScoreUpdate, undoRequest, gameState, sessionConfig
         case playerAssignment, profileSync, statsUpdate, turnLock, turnUnlock, gameStarted
     }
 
@@ -121,6 +130,8 @@ enum MultiplayerMessage: Codable {
         switch self {
         case .scoreUpdate(let p):
             try c.encode(Tag.scoreUpdate, forKey: .type); try c.encode(p, forKey: .payload)
+        case .quickScoreUpdate(let p):
+            try c.encode(Tag.quickScoreUpdate, forKey: .type); try c.encode(p, forKey: .payload)
         case .undoRequest(let id):
             try c.encode(Tag.undoRequest, forKey: .type); try c.encode(id, forKey: .payload)
         case .gameState(let s):
@@ -146,6 +157,7 @@ enum MultiplayerMessage: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         switch try c.decode(Tag.self, forKey: .type) {
         case .scoreUpdate:      self = .scoreUpdate(try c.decode(ScoreUpdatePayload.self, forKey: .payload))
+        case .quickScoreUpdate: self = .quickScoreUpdate(try c.decode(QuickScoreUpdatePayload.self, forKey: .payload))
         case .undoRequest:      self = .undoRequest(deviceID: try c.decode(String.self, forKey: .payload))
         case .gameState:        self = .gameState(try c.decode(NetworkGameState.self, forKey: .payload))
         case .sessionConfig:    self = .sessionConfig(try c.decode(SessionConfig.self, forKey: .payload))
@@ -201,6 +213,28 @@ extension Dictionary where Key == String {
     func uuidKeyed() -> [UUID: Value] {
         reduce(into: [:]) { result, pair in
             if let id = UUID(uuidString: pair.key) { result[id] = pair.value }
+        }
+    }
+}
+
+extension Dictionary where Key == UUID, Value == [CricketTarget: Int] {
+    var stringKeyedCricketMarks: [String: [String: Int]] {
+        reduce(into: [:]) { result, pair in
+            result[pair.key.uuidString] = pair.value.reduce(into: [:]) { targetResult, targetPair in
+                targetResult["\(targetPair.key.rawValue)"] = targetPair.value
+            }
+        }
+    }
+}
+
+extension Dictionary where Key == String, Value == [String: Int] {
+    func uuidKeyedCricketMarks() -> [UUID: [CricketTarget: Int]] {
+        reduce(into: [:]) { result, pair in
+            guard let playerID = UUID(uuidString: pair.key) else { return }
+            result[playerID] = pair.value.reduce(into: [:]) { marksResult, markPair in
+                guard let rawValue = Int(markPair.key), let target = CricketTarget(rawValue: rawValue) else { return }
+                marksResult[target] = markPair.value
+            }
         }
     }
 }
