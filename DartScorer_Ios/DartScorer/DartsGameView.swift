@@ -16,7 +16,10 @@ struct DartsGameView: View {
     @AppStorage("appAccentRed") private var appAccentRed = AppAccentColor.defaultRed
     @AppStorage("appAccentGreen") private var appAccentGreen = AppAccentColor.defaultGreen
     @AppStorage("appAccentBlue") private var appAccentBlue = AppAccentColor.defaultBlue
+    @AppStorage("scoreEntryMode") private var storedScoreEntryModeRaw = ScoreEntryMode.throwsMode.rawValue
     @State private var selectedMultiplier: DartMultiplier = .single
+    @State private var quickScoreText = ""
+    @State private var isShowingQuickScoreInput = false
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupGameMode: GameMode = .x01
@@ -44,13 +47,31 @@ struct DartsGameView: View {
 
     private var isInputLocked: Bool { session.isInputLocked }
 
+    private var scoreEntryMode: Binding<ScoreEntryMode> {
+        Binding(
+            get: { ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode },
+            set: { storedScoreEntryModeRaw = $0.rawValue }
+        )
+    }
+
+    private var canUseQuickScoreMode: Bool {
+        game.gameMode != .cricket
+    }
+
+    private var isVisitOpenInThrowsMode: Bool {
+        game.currentTurn.dartsUsed > 0
+    }
+
     private var winnerTitle: String {
-        game.setWinner == nil ? "Leg Won" : "Winner"
+        game.gameMode == .x01 ? (game.setWinner == nil ? "Leg Won" : "Winner") : "Winner"
     }
 
     private var winningSubtitle: String {
         if game.gameMode == .practice {
             return "Practice session."
+        }
+        if game.gameMode == .cricket {
+            return "Closed all targets and finished ahead."
         }
         if game.setWinner != nil {
             return "Match complete."
@@ -58,6 +79,16 @@ struct DartsGameView: View {
         let outText = game.finishRule == .doubleOut ? "double-out" : "single-out"
         let inText = game.inRule == .doubleIn ? "double-in" : "default-in"
         return "Played \(inText), \(outText)."
+    }
+
+    private var visibleStatusMessage: String? {
+        guard let statusMessage = game.statusMessage else { return nil }
+        switch statusMessage {
+        case "Practice mode", "Close all numbers and finish level or ahead.":
+            return nil
+        default:
+            return statusMessage
+        }
     }
 
     var body: some View {
@@ -84,21 +115,34 @@ struct DartsGameView: View {
                 )
                 .padding(.horizontal)
 
-                ScoreboardSection(
-                    players: game.players,
-                    activePlayerIndex: game.activePlayerIndex,
-                    setModeEnabled: game.setModeEnabled,
-                    legsWon: game.legsWon(for:),
-                    throwsToDisplay: throwsToDisplay(for:at:),
-                    legAverage: game.legAverage(for:)
-                )
+                Group {
+                    if game.gameMode == .cricket {
+                        CricketBoardSection(
+                            players: game.players,
+                            activePlayerIndex: game.activePlayerIndex,
+                            targets: game.cricketTargets,
+                            marks: game.cricketMarks(for:target:),
+                            score: game.cricketScore(for:),
+                            throwsToDisplay: throwsToDisplay(for:at:)
+                        )
+                    } else {
+                        ScoreboardSection(
+                            players: game.players,
+                            activePlayerIndex: game.activePlayerIndex,
+                            setModeEnabled: game.setModeEnabled,
+                            legsWon: game.legsWon(for:),
+                            throwsToDisplay: throwsToDisplay(for:at:),
+                            legAverage: game.legAverage(for:)
+                        )
+                    }
+                }
                 .padding(.horizontal)
 
                 Divider()
                     .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 16) {
-                    if let statusMessage = game.statusMessage {
+                    if let statusMessage = visibleStatusMessage {
                         Text(statusMessage)
                             .foregroundStyle(.secondary)
                     }
@@ -113,33 +157,38 @@ struct DartsGameView: View {
                         isBogey: game.isCurrentScoreBogey
                     )
                     .padding(.horizontal)
-                } else {
-                    Text("Practice mode")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
                 }
 
                 Divider()
                     .padding(.horizontal)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    MultiplierPickerView(selection: $selectedMultiplier)
-                    NumberPadView(
-                        selectedMultiplier: selectedMultiplier,
-                        isInputLocked: isInputLocked,
-                        hasWinner: game.winner != nil,
-                        onNumberTap: { value in
-                            submitThrowAndReset(.number(value), multiplier: selectedMultiplier)
-                        },
-                        onBullTap: {
-                            submitThrowAndReset(.bull, multiplier: selectedMultiplier)
-                        },
-                        onZeroTap: {
-                            submitThrowAndReset(.number(0), multiplier: .single)
-                        },
-                        onNoScoreTap: submitNoScoreTurn
-                    )
+                    if canUseQuickScoreMode {
+                        ScoreEntryModePicker(selection: scoreEntryMode)
+                    }
+
+                    if canUseQuickScoreMode {
+                        ZStack(alignment: .top) {
+                            throwsInputPanel
+                                .opacity((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .throwsMode ? 1 : 0)
+                                .allowsHitTesting((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .throwsMode)
+
+                            QuickScorePadView(
+                                scoreText: $quickScoreText,
+                                isShowingManualInput: $isShowingQuickScoreInput,
+                                isInputLocked: isInputLocked,
+                                hasWinner: game.winner != nil,
+                                isVisitOpenInThrowsMode: isVisitOpenInThrowsMode,
+                                onQuickScoreTap: submitQuickScore,
+                                onSubmitManualScore: submitManualQuickScore,
+                                onNoScoreTap: submitNoScoreTurn
+                            )
+                            .opacity((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .quick ? 1 : 0)
+                            .allowsHitTesting((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .quick)
+                        }
+                    } else {
+                        throwsInputPanel
+                    }
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
@@ -215,6 +264,13 @@ struct DartsGameView: View {
             if winnerID == nil {
                 hasPersistedCompletedGame = false
             }
+        }
+        .onChange(of: game.gameMode) { _, mode in
+            if mode == .cricket {
+                storedScoreEntryModeRaw = ScoreEntryMode.throwsMode.rawValue
+            }
+            quickScoreText = ""
+            isShowingQuickScoreInput = false
         }
         .alert("Player Disconnected", isPresented: Binding(
             get: { disconnectedPeerName != nil },
@@ -344,6 +400,58 @@ struct DartsGameView: View {
             }
         }
         selectedMultiplier = .single
+    }
+
+    private func submitQuickScore(_ score: Int) {
+        guard !isVisitOpenInThrowsMode else { return }
+        let previousScore = game.activePlayer.score
+        if session.isActive {
+            session.handleQuickScore(score)
+        } else {
+            game.submitQuickScore(score)
+        }
+        if let status = game.statusMessage {
+            if status.contains("wins") {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } else if previousScore < game.activePlayer.score && game.activePlayer.score > 0 {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            } else {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        } else if game.activePlayer.score == 0 {
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        quickScoreText = ""
+        isShowingQuickScoreInput = false
+    }
+
+    private func submitManualQuickScore() {
+        guard let score = Int(quickScoreText.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        submitQuickScore(score)
+    }
+
+    @ViewBuilder
+    private var throwsInputPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MultiplierPickerView(selection: $selectedMultiplier)
+            NumberPadView(
+                selectedMultiplier: selectedMultiplier,
+                isInputLocked: isInputLocked,
+                hasWinner: game.winner != nil,
+                onNumberTap: { value in
+                    submitThrowAndReset(.number(value), multiplier: selectedMultiplier)
+                },
+                onBullTap: {
+                    submitThrowAndReset(.bull, multiplier: selectedMultiplier)
+                },
+                onZeroTap: {
+                    submitThrowAndReset(.number(0), multiplier: .single)
+                },
+                onNoScoreTap: submitNoScoreTurn
+            )
+        }
     }
 
     private func presentNewGameSetup() {

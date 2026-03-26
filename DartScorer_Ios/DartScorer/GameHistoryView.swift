@@ -57,10 +57,14 @@ private struct GameRecordRow: View {
         record.playerResults.first { $0.isWinner }
     }
 
+    private var formatLabel: String {
+        record.startingScore > 0 ? "\(record.startingScore) • \(record.finishRule)" : record.finishRule
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(record.startingScore) • \(record.finishRule)")
+                Text(formatLabel)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let winner {
@@ -86,6 +90,10 @@ private struct GameRecordDetailView: View {
     let record: GameRecord
     @Environment(\.dismiss) private var dismiss
 
+    private var isCricket: Bool {
+        record.finishRule == "Cricket"
+    }
+
     private var winner: PlayerGameResult? {
         record.playerResults.first { $0.isWinner }
     }
@@ -98,12 +106,16 @@ private struct GameRecordDetailView: View {
         record.legs.filter { $0.winnerPlayerID == playerID }.count
     }
 
+    private var formatLabel: String {
+        record.startingScore > 0 ? "\(record.startingScore) • \(record.finishRule)" : record.finishRule
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Match Summary") {
                     HistoryMetricRow(title: "Date", value: record.date.formatted(date: .abbreviated, time: .omitted))
-                    HistoryMetricRow(title: "Format", value: "\(record.startingScore) • \(record.finishRule)")
+                    HistoryMetricRow(title: "Format", value: formatLabel)
                     HistoryMetricRow(title: "Winner", value: winner?.name ?? "—")
                     if record.legs.count > 1 {
                         HistoryMetricRow(title: "Total Legs", value: "\(record.legs.count)")
@@ -140,17 +152,28 @@ private struct GameRecordDetailView: View {
                             }
 
                             HStack(spacing: 20) {
-                                HistoryStatBlock(title: "Average", value: String(format: "%.1f", result.average))
+                                if isCricket {
+                                    HistoryStatBlock(title: "Score", value: "\(result.totalPointsScored)")
+                                } else {
+                                    HistoryStatBlock(title: "Average", value: String(format: "%.1f", result.average))
+                                }
                                 HistoryStatBlock(title: "Darts", value: "\(result.totalDartsThrown)")
-                                HistoryStatBlock(title: "Best Finish", value: "\(result.highestCheckout)")
                                 HistoryStatBlock(title: "Best Turn", value: "\(result.highestTurnScore)")
+                                if isCricket {
+                                    HistoryStatBlock(
+                                        title: "Scoring Avg",
+                                        value: String(format: "%.1f", result.average)
+                                    )
+                                } else {
+                                    HistoryStatBlock(title: "Best Finish", value: "\(result.highestCheckout)")
+                                }
                             }
                         }
                         .padding(.vertical, 4)
                     }
                 }
             }
-            .navigationTitle("\(record.startingScore) • \(record.finishRule)")
+            .navigationTitle(formatLabel)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
