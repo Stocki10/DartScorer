@@ -7,6 +7,7 @@ struct DartsGameView: View {
     @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
     @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
     @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
+    @AppStorage("newGameMode") private var storedNewGameModeRaw = GameMode.x01.rawValue
     @AppStorage("newGameFinishRule") private var storedNewGameFinishRuleRaw = FinishRule.doubleOut.rawValue
     @AppStorage("newGameInRule") private var storedNewGameInRuleRaw = InRule.default.rawValue
     @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
@@ -18,6 +19,7 @@ struct DartsGameView: View {
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
+    @State private var setupGameMode: GameMode = .x01
     @State private var setupFinishRule: FinishRule = .doubleOut
     @State private var setupInRule: InRule = .default
     @State private var setupStartScore: StartScoreOption = .score501
@@ -47,6 +49,9 @@ struct DartsGameView: View {
     }
 
     private var winningSubtitle: String {
+        if game.gameMode == .practice {
+            return "Practice session."
+        }
         if game.setWinner != nil {
             return "Match complete."
         }
@@ -102,11 +107,18 @@ struct DartsGameView: View {
 
                 Spacer(minLength: 0)
 
-                CheckoutBadgeView(
-                    routes: game.bestPossibleFinishLines,
-                    isBogey: game.isCurrentScoreBogey
-                )
-                .padding(.horizontal)
+                if game.gameMode == .x01 {
+                    CheckoutBadgeView(
+                        routes: game.bestPossibleFinishLines,
+                        isBogey: game.isCurrentScoreBogey
+                    )
+                    .padding(.horizontal)
+                } else {
+                    Text("Practice mode")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                }
 
                 Divider()
                     .padding(.horizontal)
@@ -164,6 +176,7 @@ struct DartsGameView: View {
         .sheet(isPresented: $isShowingNewGameSetup) {
             NewGameSetupView(
                 setupPlayers: $setupPlayers,
+                gameMode: $setupGameMode,
                 finishRule: $setupFinishRule,
                 inRule: $setupInRule,
                 startScore: $setupStartScore,
@@ -263,10 +276,11 @@ struct DartsGameView: View {
         }
         game.newGame(
             players: playerObjects,
+            gameMode: setupGameMode,
             finishRule: setupFinishRule,
             inRule: setupInRule,
-            startingScore: setupStartScore.rawValue,
-            setModeEnabled: setupSetModeEnabled,
+            startingScore: setupGameMode == .practice ? 0 : setupStartScore.rawValue,
+            setModeEnabled: setupGameMode == .x01 ? setupSetModeEnabled : false,
             legsToWin: setupLegsToWin
         )
         if session.role == .host {
@@ -285,6 +299,17 @@ struct DartsGameView: View {
     }
 
     private func submitThrowAndReset(_ segment: DartSegment, multiplier: DartMultiplier) {
+        if game.gameMode == .practice {
+            if session.isActive {
+                session.handleThrow(segment: segment, multiplier: multiplier)
+            } else {
+                game.submitThrow(segment: segment, multiplier: multiplier)
+            }
+            selectedMultiplier = .single
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+
         let previousScore = game.activePlayer.score
         if session.isActive {
             session.handleThrow(segment: segment, multiplier: multiplier)
@@ -349,6 +374,7 @@ struct DartsGameView: View {
         }
 
         setupFinishRule = FinishRule(rawValue: storedNewGameFinishRuleRaw) ?? game.finishRule
+        setupGameMode = GameMode(rawValue: storedNewGameModeRaw) ?? game.gameMode
         setupInRule = InRule(rawValue: storedNewGameInRuleRaw) ?? game.inRule
         setupStartScore = StartScoreOption(rawValue: storedNewGameStartScoreRaw)
             ?? (StartScoreOption(rawValue: game.startingScore) ?? .score501)
@@ -401,6 +427,7 @@ struct DartsGameView: View {
             storedPlayerProfileIDsJSON = json
         }
         storedNewGameFinishRuleRaw = setupFinishRule.rawValue
+        storedNewGameModeRaw = setupGameMode.rawValue
         storedNewGameInRuleRaw = setupInRule.rawValue
         storedNewGameStartScoreRaw = setupStartScore.rawValue
         storedNewGameSetModeEnabled = setupSetModeEnabled

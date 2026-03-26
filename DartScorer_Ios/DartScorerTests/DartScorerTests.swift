@@ -218,6 +218,46 @@ struct DartScorerTests {
         #expect(game.bestPossibleFinishLine == nil)
     }
 
+    @Test func practiceModeAccumulatesScoreInsteadOfSubtracting() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice)
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.players[0].score == 60)
+        #expect(game.winner == nil)
+        #expect(game.bestPossibleFinishLine == nil)
+    }
+
+    @Test func practiceModeSwitchesAfterThreeDarts() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice)
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(20), multiplier: .single)
+
+        #expect(game.players[0].score == 60)
+        #expect(game.activePlayerIndex == 1)
+        #expect(game.currentTurn.darts.isEmpty)
+    }
+
+    @Test func practiceModeAllowsSinglePlayerSetup() {
+        let game = DartsGame(playerCount: 2)
+
+        game.newGame(
+            playerNames: ["Solo"],
+            gameMode: .practice,
+            finishRule: .doubleOut,
+            inRule: .default,
+            startingScore: 0,
+            setModeEnabled: false,
+            legsToWin: 1
+        )
+
+        #expect(game.gameMode == .practice)
+        #expect(game.players.count == 1)
+        #expect(game.players[0].score == 0)
+    }
+
     @Test func bestPossibleFinishCacheInvalidatesOnUndo() {
         let game = DartsGame(playerCount: 2)
         
@@ -251,5 +291,230 @@ struct DartScorerTests {
         game.submitThrow(segment: .number(20), multiplier: .double)
         
         #expect(game.hasOpenedLegByPlayerID[game.players[0].id] == true)
+    }
+
+    @Test func gameRecordDecodesWithoutLegs() throws {
+        struct LegacyGameRecord: Codable {
+            let id: UUID
+            let date: Date
+            let startingScore: Int
+            let finishRule: String
+            let playerResults: [PlayerGameResult]
+        }
+
+        let legacy = LegacyGameRecord(
+            id: UUID(),
+            date: Date(timeIntervalSince1970: 1234),
+            startingScore: 501,
+            finishRule: FinishRule.doubleOut.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: UUID(),
+                    name: "A",
+                    average: 60,
+                    highestTurnScore: 100,
+                    checkoutPercentage: 0.5,
+                    isWinner: true,
+                    profileID: nil,
+                    totalDartsThrown: 18,
+                    totalPointsScored: 360,
+                    highestCheckout: 40
+                )
+            ]
+        )
+
+        let data = try JSONEncoder().encode(legacy)
+        let decoded = try JSONDecoder().decode(GameRecord.self, from: data)
+
+        #expect(decoded.legs.isEmpty)
+    }
+
+    @Test func legRecordDecodesWithoutAnalyticsFields() throws {
+        struct LegacyLegPlayerResult: Codable {
+            let playerID: UUID
+            let name: String
+            let dartsThrown: Int
+            let pointsScored: Int
+            let average: Double
+            let firstNineAverage: Double?
+            let highestFinish: Int
+            let highestTurnScore: Int
+        }
+
+        struct LegacyLegRecord: Codable {
+            let legNumber: Int
+            let startingPlayerID: UUID
+            let winnerPlayerID: UUID
+            let winningCheckoutRoute: String?
+            let playerResults: [LegacyLegPlayerResult]
+        }
+
+        let playerID = UUID()
+        let legacy = LegacyLegRecord(
+            legNumber: 1,
+            startingPlayerID: playerID,
+            winnerPlayerID: playerID,
+            winningCheckoutRoute: "D20",
+            playerResults: [
+                LegacyLegPlayerResult(
+                    playerID: playerID,
+                    name: "A",
+                    dartsThrown: 12,
+                    pointsScored: 301,
+                    average: 75.25,
+                    firstNineAverage: 90,
+                    highestFinish: 40,
+                    highestTurnScore: 100
+                )
+            ]
+        )
+
+        let data = try JSONEncoder().encode(legacy)
+        let decoded = try JSONDecoder().decode(LegRecord.self, from: data)
+
+        #expect(decoded.checkoutScore == nil)
+        #expect(decoded.playerVisits.isEmpty)
+        #expect(decoded.playerResults.first?.bustCount == 0)
+    }
+
+    @Test func singleLegMatchProducesOneLegRecord() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let record = game.buildGameRecord()
+        #expect(record.legs.count == 1)
+        #expect(record.legs[0].winnerPlayerID == game.players[0].id)
+        #expect(record.legs[0].checkoutScore == 40)
+        #expect(record.legs[0].winningCheckoutRoute == "D20")
+        #expect(record.legs[0].playerVisits.count == 1)
+    }
+
+    @Test func setModeMatchProducesLegRecordPerCompletedLeg() {
+        let game = DartsGame(playerCount: 2, setModeEnabled: true, legsToWin: 2)
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let record = game.buildGameRecord()
+        #expect(record.legs.count == 2)
+        #expect(record.legs.map(\.legNumber) == [1, 2])
+    }
+
+    @Test func winningCheckoutRouteIsRecorded() {
+        let game = DartsGame(playerCount: 2)
+        game.players[0].score = 170
+        game.currentTurn = Turn(startingScore: 170)
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .bull, multiplier: .double)
+
+        let record = game.buildGameRecord()
+        #expect(record.legs.first?.checkoutScore == 170)
+        #expect(record.legs.first?.winningCheckoutRoute == "T20 T20 Bull")
+    }
+
+    @Test func bustCountAndVisitTimelineAreRecorded() {
+        let game = DartsGame(playerCount: 2)
+        let firstPlayerID = game.players[0].id
+        let secondPlayerID = game.players[1].id
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        game.players[1].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let leg = game.buildGameRecord().legs[0]
+        let firstPlayerResult = leg.playerResults.first { $0.playerID == firstPlayerID }
+        let secondPlayerVisits = leg.playerVisits.filter { $0.playerID == secondPlayerID }
+        let firstPlayerVisits = leg.playerVisits.filter { $0.playerID == firstPlayerID }
+
+        #expect(firstPlayerResult?.bustCount == 1)
+        #expect(firstPlayerVisits.count == 1)
+        #expect(firstPlayerVisits.first?.isBust == true)
+        #expect(secondPlayerVisits.map(\.score) == [40])
+    }
+
+    @Test func firstNineAverageUsesAllScoredDartsWhenUnderNine() {
+        let game = DartsGame(playerCount: 2)
+
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let firstNineAverage = game.buildGameRecord().legs[0].playerResults[0].firstNineAverage
+        #expect(firstNineAverage != nil)
+        #expect(abs((firstNineAverage ?? 0) - (160.0 / 7.0 * 3.0)) < 0.001)
+    }
+
+    @Test func firstNineAverageUsesExactlyNineDarts() {
+        let game = DartsGame(playerCount: 2)
+
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let firstNineAverage = game.buildGameRecord().legs[0].playerResults[0].firstNineAverage
+        #expect(firstNineAverage != nil)
+        #expect(abs((firstNineAverage ?? 0) - 60.0) < 0.001)
+    }
+
+    @Test func firstNineAverageIgnoresDartsAfterNine() {
+        let game = DartsGame(playerCount: 2)
+
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(20), multiplier: .single) }
+        for _ in 0..<3 { game.submitThrow(segment: .number(0), multiplier: .single) }
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let firstNineAverage = game.buildGameRecord().legs[0].playerResults[0].firstNineAverage
+        #expect(firstNineAverage != nil)
+        #expect(abs((firstNineAverage ?? 0) - 60.0) < 0.001)
+    }
+
+    @Test func buildGameRecordIncludesCompletedPriorLegsAndFinalLeg() {
+        let game = DartsGame(playerCount: 2, setModeEnabled: true, legsToWin: 2)
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        game.players[0].score = 40
+        game.currentTurn = Turn(startingScore: 40)
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        let record = game.buildGameRecord()
+        #expect(record.legs.count == 2)
+        #expect(record.legs[0].winnerPlayerID == record.legs[1].winnerPlayerID)
     }
 }
