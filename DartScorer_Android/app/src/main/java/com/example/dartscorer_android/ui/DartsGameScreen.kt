@@ -1,92 +1,76 @@
 package com.example.dartscorer_android.ui
 
 import android.content.Context.MODE_PRIVATE
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
+import android.content.SharedPreferences
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import com.example.dartscorer_android.game.DartMultiplier
 import com.example.dartscorer_android.game.DartSegment
 import com.example.dartscorer_android.game.DartsGame
 import com.example.dartscorer_android.game.FinishRule
 import com.example.dartscorer_android.game.InRule
-import com.example.dartscorer_android.game.Player
 import com.example.dartscorer_android.game.StartScoreOption
 import com.example.dartscorer_android.ui.theme.AppColorTheme
 import com.example.dartscorer_android.ui.theme.AppThemeMode
 import kotlin.math.max
 
-private data class SetupPlayer(
-    val id: Int,
-    var name: String,
-    val defaultName: String
-)
+internal data class SetupPlayer(val id: Int, val savedId: Int?, var name: String, val defaultName: String, val colorIndex: Int)
+internal data class WinnerOverlayState(val winnerName: String, val isSetWin: Boolean, val isSetMode: Boolean)
+internal data class SavedPlayer(val id: Int, val name: String, val colorIndex: Int)
 
-private data class WinnerOverlayState(
-    val winnerName: String,
-    val isSetWin: Boolean
-)
+private enum class NavTab { PLAY, HISTORY, PLAYERS, SETTINGS }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+// ── SavedPlayer persistence helpers ──────────────────────────────────────────
+
+private fun serializeSavedPlayers(players: List<SavedPlayer>): String =
+    players.joinToString("|") { "${it.id}\t${it.name}\t${it.colorIndex}" }
+
+private fun deserializeSavedPlayers(raw: String): List<SavedPlayer> {
+    if (raw.isBlank()) return emptyList()
+    return raw.split("|").mapNotNull { entry ->
+        val parts = entry.split("\t")
+        if (parts.size < 3) return@mapNotNull null
+        SavedPlayer(
+            id = parts[0].toIntOrNull() ?: return@mapNotNull null,
+            name = parts[1],
+            colorIndex = parts[2].toIntOrNull() ?: 0
+        )
+    }
+}
+
+private fun loadSavedPlayers(prefs: SharedPreferences): List<SavedPlayer> =
+    deserializeSavedPlayers(prefs.getString(KEY_SAVED_PLAYERS, "") ?: "")
+
+private fun persistSavedPlayers(prefs: SharedPreferences, players: List<SavedPlayer>) {
+    prefs.edit().putString(KEY_SAVED_PLAYERS, serializeSavedPlayers(players)).apply()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
 fun DartsGameScreen(
     selectedThemeMode: AppThemeMode,
@@ -96,28 +80,14 @@ fun DartsGameScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(APP_PREFS, MODE_PRIVATE) }
-    val initialNames = remember {
-        val parsed = prefs.getString(KEY_SETUP_PLAYER_NAMES, null)
-            ?.split(NAME_DELIMITER)
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() }
-            ?.take(5)
-            .orEmpty()
-        when {
-            parsed.isEmpty() -> listOf("Player 1", "Player 2")
-            parsed.size == 1 -> parsed + "Player 2"
-            else -> parsed
-        }
-    }
+
     val initialFinishRule = remember {
         prefs.getString(KEY_SETUP_FINISH_RULE, FinishRule.DOUBLE_OUT.name)
-            ?.let { runCatching { FinishRule.valueOf(it) }.getOrDefault(FinishRule.DOUBLE_OUT) }
-            ?: FinishRule.DOUBLE_OUT
+            ?.let { runCatching { FinishRule.valueOf(it) }.getOrDefault(FinishRule.DOUBLE_OUT) } ?: FinishRule.DOUBLE_OUT
     }
     val initialInRule = remember {
         prefs.getString(KEY_SETUP_IN_RULE, InRule.DEFAULT.name)
-            ?.let { runCatching { InRule.valueOf(it) }.getOrDefault(InRule.DEFAULT) }
-            ?: InRule.DEFAULT
+            ?.let { runCatching { InRule.valueOf(it) }.getOrDefault(InRule.DEFAULT) } ?: InRule.DEFAULT
     }
     val initialStartScore = remember {
         val stored = prefs.getInt(KEY_SETUP_START_SCORE, StartScoreOption.SCORE_501.score)
@@ -126,9 +96,26 @@ fun DartsGameScreen(
     val initialSetMode = remember { prefs.getBoolean(KEY_SETUP_SET_MODE, false) }
     val initialLegsToWin = remember { prefs.getInt(KEY_SETUP_LEGS_TO_WIN, 3).coerceAtLeast(1) }
 
+    // Saved players (persistent across app launches)
+    val savedPlayers = remember { mutableStateListOf<SavedPlayer>().also { it.addAll(loadSavedPlayers(prefs)) } }
+
+    val initialSetupPlayers: List<SetupPlayer> = remember {
+        val storedIds = prefs.getString(KEY_SETUP_PLAYER_IDS, null)
+            ?.split(",")?.mapNotNull { it.trim().toIntOrNull() }
+        if (!storedIds.isNullOrEmpty()) {
+            storedIds.mapIndexed { idx, sid ->
+                val sp = savedPlayers.firstOrNull { it.id == sid }
+                SetupPlayer(id = idx + 1, savedId = sid, name = sp?.name ?: "Player ${idx + 1}", defaultName = "Player ${idx + 1}")
+            }.takeIf { it.size >= 2 }
+        } else null
+    } ?: listOf(
+        SetupPlayer(id = 1, savedId = null, name = "Player 1", defaultName = "Player 1"),
+        SetupPlayer(id = 2, savedId = null, name = "Player 2", defaultName = "Player 2")
+    )
+
     val game = remember {
         DartsGame(
-            playerCount = initialNames.size,
+            playerCount = initialSetupPlayers.size,
             startingScore = initialStartScore.score,
             finishRule = initialFinishRule,
             inRule = initialInRule,
@@ -136,7 +123,7 @@ fun DartsGameScreen(
             legsToWin = initialLegsToWin
         ).apply {
             newGame(
-                playerNames = initialNames,
+                playerNames = initialSetupPlayers.map { it.name },
                 finishRule = initialFinishRule,
                 inRule = initialInRule,
                 startingScore = initialStartScore.score,
@@ -145,27 +132,38 @@ fun DartsGameScreen(
             )
         }
     }
+
+    var currentTab by remember { mutableStateOf(NavTab.PLAY) }
+    var isInSetupMode by remember { mutableStateOf(true) }
+    var hasActiveGame by remember { mutableStateOf(false) }
+    // gamePlayerId (1-indexed) → colorIndex, rebuilt each time START is pressed
+    var playerColorMap by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var renderTick by remember { mutableIntStateOf(0) }
     var selectedMultiplier by remember { mutableStateOf(DartMultiplier.SINGLE) }
-    var showNewGameDialog by remember { mutableStateOf(true) }
-    var showRestartDialog by remember { mutableStateOf(false) }
-    var showSettingsDialog by remember { mutableStateOf(false) }
     var winnerOverlay by remember { mutableStateOf<WinnerOverlayState?>(null) }
-    val setupPlayers = remember { mutableStateListOf<SetupPlayer>() }
+    val gameHistory = remember { mutableStateListOf<GameResult>() }
+    var currentLegNumber by remember { mutableIntStateOf(1) }
+    var legStartTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    val setupPlayers = remember { mutableStateListOf<SetupPlayer>().also { it.addAll(initialSetupPlayers) } }
     var setupFinishRule by remember { mutableStateOf(initialFinishRule) }
     var setupInRule by remember { mutableStateOf(initialInRule) }
     var setupStartScore by remember { mutableStateOf(initialStartScore) }
     var setupSetModeEnabled by remember { mutableStateOf(initialSetMode) }
     var setupLegsToWin by remember { mutableIntStateOf(initialLegsToWin) }
 
+    val completedRounds = remember { mutableStateListOf<CompletedRound>() }
+    var uiActivePlayerIndex by remember { mutableIntStateOf(0) }
+    val currentTurnLabels = remember { mutableStateListOf<String>() }
+    val currentTurnIsDouble = remember { mutableStateListOf<Boolean>() }
+    val currentTurnIsTriple = remember { mutableStateListOf<Boolean>() }
+    var globalRoundCounter by remember { mutableIntStateOf(1) }
+
     fun syncSetupFromGame() {
         setupPlayers.clear()
         game.players.forEachIndexed { index, player ->
-            setupPlayers += SetupPlayer(
-                id = player.id,
-                name = player.name,
-                defaultName = "Player ${index + 1}"
-            )
+            val savedPlayer = savedPlayers.firstOrNull { it.name == player.name }
+            setupPlayers += SetupPlayer(id = player.id, savedId = savedPlayer?.id, name = player.name, defaultName = "Player ${index + 1}")
         }
         setupFinishRule = game.finishRule
         setupInRule = game.inRule
@@ -175,8 +173,9 @@ fun DartsGameScreen(
     }
 
     fun persistSetupToPrefs() {
+        val ids = setupPlayers.mapNotNull { it.savedId }.joinToString(",")
         prefs.edit()
-            .putString(KEY_SETUP_PLAYER_NAMES, setupPlayers.map { it.name }.joinToString(NAME_DELIMITER))
+            .putString(KEY_SETUP_PLAYER_IDS, ids)
             .putString(KEY_SETUP_FINISH_RULE, setupFinishRule.name)
             .putString(KEY_SETUP_IN_RULE, setupInRule.name)
             .putInt(KEY_SETUP_START_SCORE, setupStartScore.score)
@@ -185,304 +184,284 @@ fun DartsGameScreen(
             .apply()
     }
 
-    fun syncWinnerOverlayFromGame() {
-        if (winnerOverlay != null) return
-        val winnerName = game.winner?.name ?: game.players.firstOrNull { it.score == 0 }?.name
-        if (winnerName != null) {
-            winnerOverlay = WinnerOverlayState(
-                winnerName = winnerName,
-                isSetWin = game.setWinner != null
-            )
+    fun recordTurnIfPlayerChanged(newPlayerIndex: Int, wasCheckout: Boolean = false) {
+        if (uiActivePlayerIndex != newPlayerIndex || wasCheckout) {
+            if (currentTurnLabels.isNotEmpty()) {
+                val total = currentTurnLabels.sumOf { label ->
+                    when {
+                        label.startsWith("T") -> (label.drop(1).toIntOrNull() ?: 0) * 3
+                        label.startsWith("D") -> (label.drop(1).toIntOrNull() ?: 0) * 2
+                        label == "Bull" -> 50
+                        label == "25" -> 25
+                        else -> label.toIntOrNull() ?: 0
+                    }
+                }
+                val playerName = game.players.getOrNull(uiActivePlayerIndex)?.name ?: "Player"
+                completedRounds += CompletedRound(
+                    roundNumber = globalRoundCounter++,
+                    playerName = playerName,
+                    throwLabels = currentTurnLabels.toList(),
+                    isDoubleList = currentTurnIsDouble.toList(),
+                    isTripleList = currentTurnIsTriple.toList(),
+                    total = total,
+                    wasCheckout = wasCheckout
+                )
+                currentTurnLabels.clear()
+                currentTurnIsDouble.clear()
+                currentTurnIsTriple.clear()
+            }
+            uiActivePlayerIndex = newPlayerIndex
         }
     }
 
-    if (showNewGameDialog && setupPlayers.isEmpty()) {
-        syncSetupFromGame()
-    }
-
-    if (showNewGameDialog) {
-        NewGameDialog(
-            setupPlayers = setupPlayers,
-            finishRule = setupFinishRule,
-            onFinishRuleChange = { setupFinishRule = it },
-            inRule = setupInRule,
-            onInRuleChange = { setupInRule = it },
-            startScore = setupStartScore,
-            onStartScoreChange = { setupStartScore = it },
-            setModeEnabled = setupSetModeEnabled,
-            onSetModeChange = { setupSetModeEnabled = it },
-            legsToWin = setupLegsToWin,
-            onLegsToWinChange = { setupLegsToWin = max(1, it) },
-            onPlayerCountChange = { count ->
-                val clamped = count.coerceIn(2, 5)
-                if (clamped > setupPlayers.size) {
-                    val start = setupPlayers.size + 1
-                    for (index in start..clamped) {
-                        setupPlayers += SetupPlayer(
-                            id = setupPlayers.maxOfOrNull { it.id }?.plus(1) ?: 1,
-                            name = "Player $index",
-                            defaultName = "Player $index"
-                        )
-                    }
-                } else if (clamped < setupPlayers.size) {
-                    repeat(setupPlayers.size - clamped) { setupPlayers.removeAt(setupPlayers.lastIndex) }
-                }
-            },
-            onCancel = {
-                showNewGameDialog = false
-                if (game.players.isEmpty()) {
-                    syncSetupFromGame()
-                }
-            },
-            onStart = {
-                game.newGame(
-                    playerNames = setupPlayers.map { it.name },
-                    finishRule = setupFinishRule,
-                    inRule = setupInRule,
-                    startingScore = setupStartScore.score,
-                    setModeEnabled = setupSetModeEnabled,
-                    legsToWin = setupLegsToWin
+    fun buildGameResult(winnerName: String, isSetWin: Boolean, checkoutLabel: String?): GameResult {
+        val duration = (System.currentTimeMillis() - legStartTime) / 1000
+        val checkoutScore = completedRounds.lastOrNull { it.wasCheckout }?.total
+        return GameResult(
+            winnerName = winnerName,
+            isSetWin = isSetWin,
+            startingScore = game.startingScore,
+            checkoutLabel = checkoutLabel,
+            checkoutScore = checkoutScore,
+            legNumber = currentLegNumber,
+            durationSeconds = duration,
+            playerStats = game.players.map { player ->
+                PlayerMatchStat(
+                    name = player.name,
+                    averagePPR = game.legAverage(player) ?: 0.0,
+                    dartsThrown = game.dartsThrownByPlayerId[player.id] ?: 0,
+                    remainingScore = player.score
                 )
-                winnerOverlay = null
-                persistSetupToPrefs()
-                selectedMultiplier = DartMultiplier.SINGLE
-                showNewGameDialog = false
-                renderTick++
-            }
-        )
-    }
-
-    if (showRestartDialog) {
-        AlertDialog(
-            onDismissRequest = { showRestartDialog = false },
-            title = { Text("Restart Leg?") },
-            text = { Text("You already started this leg. This will discard current progress.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        game.restartLeg()
-                        winnerOverlay = null
-                        showRestartDialog = false
-                        renderTick++
-                    }
-                ) { Text("Restart Leg") }
             },
-            dismissButton = {
-                TextButton(onClick = { showRestartDialog = false }) { Text("Cancel") }
+            roundHistory = completedRounds.toList(),
+            timestamp = System.currentTimeMillis()
+        )
+    }
+
+    fun syncWinnerOverlay() {
+        if (winnerOverlay != null) return
+        val winner = game.winner ?: game.players.firstOrNull { it.score == 0 } ?: return
+        winnerOverlay = WinnerOverlayState(winnerName = winner.name, isSetWin = game.setWinner != null, isSetMode = game.setModeEnabled)
+    }
+
+    fun handleThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        val prevPlayerIndex = game.activePlayerIndex
+        game.submitThrow(segment, multiplier)
+
+        val throwLabel = when {
+            segment is DartSegment.Bull && multiplier == DartMultiplier.DOUBLE -> "Bull"
+            segment is DartSegment.Bull -> "25"
+            segment is DartSegment.Number -> when (multiplier) {
+                DartMultiplier.SINGLE -> "${segment.value}"
+                DartMultiplier.DOUBLE -> "D${segment.value}"
+                DartMultiplier.TRIPLE -> "T${segment.value}"
             }
-        )
+            else -> "0"
+        }
+        currentTurnLabels += throwLabel
+        currentTurnIsDouble += (multiplier == DartMultiplier.DOUBLE)
+        currentTurnIsTriple += (multiplier == DartMultiplier.TRIPLE)
+
+        val isWinner = game.winner != null
+        if (isWinner) {
+            recordTurnIfPlayerChanged(game.activePlayerIndex, wasCheckout = true)
+        } else if (game.activePlayerIndex != prevPlayerIndex) {
+            recordTurnIfPlayerChanged(game.activePlayerIndex)
+        }
+
+        if (isWinner) {
+            val lastLabel = currentTurnLabels.lastOrNull() ?: throwLabel
+            val winner = game.winner!!
+            val result = buildGameResult(winner.name, game.setWinner != null, lastLabel)
+            gameHistory.add(0, result)
+            syncWinnerOverlay()
+        }
+
+        selectedMultiplier = DartMultiplier.SINGLE
+        renderTick++
     }
 
-    if (showSettingsDialog) {
-        SettingsDialog(
-            selectedThemeMode = selectedThemeMode,
-            onThemeModeChange = onThemeModeChange,
-            selectedColorTheme = selectedColorTheme,
-            onColorThemeChange = onColorThemeChange,
-            onDismiss = { showSettingsDialog = false }
-        )
+    fun resetLegState() {
+        completedRounds.clear()
+        currentTurnLabels.clear()
+        currentTurnIsDouble.clear()
+        currentTurnIsTriple.clear()
+        uiActivePlayerIndex = 0
+        legStartTime = System.currentTimeMillis()
     }
 
-    val zeroScoreWinnerFallback = game.players.firstOrNull { it.score == 0 }
-    LaunchedEffect(game.winner?.id, zeroScoreWinnerFallback?.id, game.setWinner?.id) {
-        syncWinnerOverlayFromGame()
-    }
+    if (isInSetupMode && setupPlayers.isEmpty()) syncSetupFromGame()
+
+    LaunchedEffect(game.winner?.id, game.setWinner?.id) { syncWinnerOverlay() }
+
     Scaffold(
-        topBar = { TopAppBar(title = { Text("DartScorer") }) }
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = { AppBottomNav(currentTab = currentTab, onTabChange = { currentTab = it }) }
     ) { innerPadding ->
         key(renderTick) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(onClick = {
+            when (currentTab) {
+                NavTab.PLAY -> {
+                    if (isInSetupMode) {
+                        NewGameScreen(
+                            setupPlayers = setupPlayers,
+                            savedPlayers = savedPlayers.toList(),
+                            finishRule = setupFinishRule,
+                            onFinishRuleChange = { setupFinishRule = it },
+                            inRule = setupInRule,
+                            onInRuleChange = { setupInRule = it },
+                            startScore = setupStartScore,
+                            onStartScoreChange = { setupStartScore = it },
+                            setModeEnabled = setupSetModeEnabled,
+                            onSetModeChange = { setupSetModeEnabled = it },
+                            legsToWin = setupLegsToWin,
+                            onLegsToWinChange = { setupLegsToWin = max(1, it) },
+                            onShuffle = {
+                                val shuffled = setupPlayers.toMutableList().shuffled()
+                                setupPlayers.clear()
+                                setupPlayers.addAll(shuffled)
+                            },
+                            onCreateAndAddPlayer = { name ->
+                                val newId = (savedPlayers.maxOfOrNull { it.id } ?: 0) + 1
+                                val colorIdx = savedPlayers.size % playerIndicatorColors.size
+                                val newSaved = SavedPlayer(id = newId, name = name, colorIndex = colorIdx)
+                                savedPlayers.add(newSaved)
+                                persistSavedPlayers(prefs, savedPlayers)
+                                val slotId = (setupPlayers.maxOfOrNull { it.id } ?: 0) + 1
+                                setupPlayers.add(SetupPlayer(id = slotId, savedId = newId, name = name, defaultName = name))
+                            },
+                            onAddSavedPlayer = { savedPlayer ->
+                                if (setupPlayers.size < 5) {
+                                    val slotId = (setupPlayers.maxOfOrNull { it.id } ?: 0) + 1
+                                    setupPlayers.add(SetupPlayer(id = slotId, savedId = savedPlayer.id, name = savedPlayer.name, defaultName = savedPlayer.name))
+                                }
+                            },
+                            onRemovePlayer = { slotId ->
+                                setupPlayers.removeAll { it.id == slotId }
+                            },
+                            onBack = if (hasActiveGame) {
+                                { isInSetupMode = false; renderTick++ }
+                            } else null,
+                            onStart = {
+                                if (setupPlayers.size < 2) return@NewGameScreen
+                                // Map game player ID (1-indexed by position) → saved color index
+                                playerColorMap = setupPlayers.mapIndexed { index, sp ->
+                                    val colorIndex = sp.savedId
+                                        ?.let { sid -> savedPlayers.firstOrNull { it.id == sid }?.colorIndex }
+                                        ?: (index % playerIndicatorColors.size)
+                                    (index + 1) to colorIndex
+                                }.toMap()
+                                game.newGame(
+                                    playerNames = setupPlayers.map { it.name },
+                                    finishRule = setupFinishRule,
+                                    inRule = setupInRule,
+                                    startingScore = setupStartScore.score,
+                                    setModeEnabled = setupSetModeEnabled,
+                                    legsToWin = setupLegsToWin
+                                )
+                                winnerOverlay = null
+                                persistSetupToPrefs()
+                                selectedMultiplier = DartMultiplier.SINGLE
+                                isInSetupMode = false
+                                hasActiveGame = true
+                                resetLegState()
+                                globalRoundCounter = 1
+                                renderTick++
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    } else {
+                        GamePlayScreen(
+                            game = game,
+                            playerColorMap = playerColorMap,
+                            selectedMultiplier = selectedMultiplier,
+                            onMultiplierChange = { selectedMultiplier = it },
+                            onThrow = ::handleThrow,
+                            onUndo = {
+                                game.undoLastThrow()
+                                if (currentTurnLabels.isNotEmpty()) currentTurnLabels.removeAt(currentTurnLabels.lastIndex)
+                                if (currentTurnIsDouble.isNotEmpty()) currentTurnIsDouble.removeAt(currentTurnIsDouble.lastIndex)
+                                if (currentTurnIsTriple.isNotEmpty()) currentTurnIsTriple.removeAt(currentTurnIsTriple.lastIndex)
+                                renderTick++
+                            },
+                            onNewGame = {
                                 syncSetupFromGame()
-                                showNewGameDialog = true
-                            }) { Text("New Game") }
-
-                            OutlinedButton(onClick = {
-                            if (game.isLegInProgress) {
-                                showRestartDialog = true
-                            } else {
+                                isInSetupMode = true
+                                renderTick++
+                            },
+                            onRestartLeg = {
                                 game.restartLeg()
                                 winnerOverlay = null
                                 selectedMultiplier = DartMultiplier.SINGLE
+                                resetLegState()
                                 renderTick++
-                            }
-                            }) { Text("Restart Leg") }
-                        }
-                        IconButton(
-                            onClick = { showSettingsDialog = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = android.R.drawable.ic_menu_preferences),
-                                contentDescription = "Settings",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = {
+                            },
+                            winnerOverlay = winnerOverlay,
+                            onUndoWin = {
+                                winnerOverlay = null
                                 game.undoLastThrow()
                                 renderTick++
                             },
-                            enabled = game.canUndo,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = android.R.drawable.ic_media_previous),
-                                contentDescription = "Reverse",
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    if (winnerOverlay == null) {
-                        game.statusMessage
-                            ?.takeIf { !it.contains("wins", ignoreCase = true) && !it.contains("won", ignoreCase = true) }
-                            ?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    }
-
-                    Scoreboard(
-                        game = game,
-                        version = renderTick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    val bestFinishText = if (game.hasBestPossibleFinish) {
-                        "Best Finish: ${game.bestPossibleFinishLine}"
-                    } else {
-                        "No finish available"
-                    }
-                    ChipText(
-                        text = bestFinishText,
-                        emphasized = game.hasBestPossibleFinish
-                    )
-                    Divider()
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DartMultiplier.entries.forEach { multiplier ->
-                            FilterChip(
-                                selected = selectedMultiplier == multiplier,
-                                onClick = { selectedMultiplier = multiplier },
-                                label = { Text(multiplier.label) }
-                            )
-                        }
-                    }
-
-                    val throwButtons = (1..20).map { it.toString() } + listOf(
-                        if (selectedMultiplier == DartMultiplier.SINGLE) "25" else "Bull",
-                        "0",
-                        "",
-                        "",
-                        "NO_SCORE"
-                    )
-
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(5),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(throwButtons) { label ->
-                            if (label.isEmpty()) {
-                                Spacer(modifier = Modifier.fillMaxWidth().height(1.dp))
-                                return@items
-                            }
-
-                            val enabled = when (label) {
-                                "25", "Bull" -> game.winner == null && selectedMultiplier != DartMultiplier.TRIPLE
-                                else -> game.winner == null
-                            }
-
-                            Button(
-                                onClick = {
-                                    when (label) {
-                                        "25", "Bull" -> game.submitThrow(DartSegment.Bull, selectedMultiplier)
-                                        "0" -> game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE)
-                                        "NO_SCORE" -> {
-                                            val used = game.currentTurn.darts.size
-                                            repeat(used) { game.undoLastThrow() }
-                                            repeat(3) { game.submitThrow(DartSegment.Number(0), DartMultiplier.SINGLE) }
-                                        }
-                                        else -> game.submitThrow(DartSegment.Number(label.toInt()), selectedMultiplier)
-                                    }
-                                    syncWinnerOverlayFromGame()
-                                    selectedMultiplier = DartMultiplier.SINGLE
-                                    renderTick++
-                                },
-                                enabled = enabled,
-                                modifier = if (label == "NO_SCORE") {
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(56.dp)
-                                } else {
-                                    Modifier.fillMaxWidth()
-                                },
-                                contentPadding = if (label == "NO_SCORE") {
-                                    PaddingValues(horizontal = 4.dp, vertical = 4.dp)
-                                } else {
-                                    ButtonDefaults.ContentPadding
-                                }
-                            ) {
-                                if (label == "NO_SCORE") {
-                                    Text(
-                                        "No\nScore",
-                                        maxLines = 2,
-                                        softWrap = true,
-                                        overflow = TextOverflow.Clip,
-                                        fontSize = 11.sp,
-                                        lineHeight = 12.sp
-                                    )
-                                } else {
-                                    Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
-                                }
-                            }
-                        }
+                            onNewLegRandom = {
+                                winnerOverlay = null
+                                game.restartLegRandomSequence()
+                                selectedMultiplier = DartMultiplier.SINGLE
+                                resetLegState()
+                                currentLegNumber++
+                                renderTick++
+                            },
+                            modifier = Modifier.padding(innerPadding)
+                        )
                     }
                 }
 
-                winnerOverlay?.let { overlay ->
-                    WinnerDialog(
-                        winnerName = overlay.winnerName,
-                        isSetWin = overlay.isSetWin,
-                        onUndoWin = {
-                            winnerOverlay = null
-                            game.undoLastThrow()
-                            renderTick++
-                        },
-                        onNewLegRandom = {
-                            winnerOverlay = null
+                NavTab.HISTORY -> {
+                    HistoryScreen(
+                        results = gameHistory.toList(),
+                        onRematch = {
                             game.restartLegRandomSequence()
+                            winnerOverlay = null
                             selectedMultiplier = DartMultiplier.SINGLE
+                            resetLegState()
+                            isInSetupMode = false
+                            currentTab = NavTab.PLAY
                             renderTick++
                         },
-                        onStartNewGame = {
-                            winnerOverlay = null
-                            syncSetupFromGame()
-                            showNewGameDialog = true
-                            renderTick++
-                        }
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+
+                NavTab.PLAYERS -> {
+                    PlayersScreen(
+                        savedPlayers = savedPlayers.toList(),
+                        gameHistory = gameHistory.toList(),
+                        onCreatePlayer = { name ->
+                            val newId = (savedPlayers.maxOfOrNull { it.id } ?: 0) + 1
+                            val colorIdx = savedPlayers.size % playerIndicatorColors.size
+                            savedPlayers.add(SavedPlayer(id = newId, name = name, colorIndex = colorIdx))
+                            persistSavedPlayers(prefs, savedPlayers)
+                        },
+                        onDeletePlayer = { id ->
+                            savedPlayers.removeAll { it.id == id }
+                            persistSavedPlayers(prefs, savedPlayers)
+                        },
+                        onEditPlayer = { id, name, colorIndex ->
+                            val idx = savedPlayers.indexOfFirst { it.id == id }
+                            if (idx >= 0) {
+                                savedPlayers[idx] = savedPlayers[idx].copy(name = name, colorIndex = colorIndex)
+                                persistSavedPlayers(prefs, savedPlayers)
+                            }
+                        },
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
+
+                NavTab.SETTINGS -> {
+                    SettingsScreen(
+                        selectedThemeMode = selectedThemeMode,
+                        onThemeModeChange = onThemeModeChange,
+                        selectedColorTheme = selectedColorTheme,
+                        onColorThemeChange = onColorThemeChange,
+                        modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
@@ -490,383 +469,44 @@ fun DartsGameScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Scoreboard(game: DartsGame, version: Int, modifier: Modifier = Modifier) {
-    version
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
+private fun AppBottomNav(currentTab: NavTab, onTabChange: (NavTab) -> Unit) {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        game.players.forEachIndexed { index, player ->
-            val active = index == game.activePlayerIndex
-            val throwsForBadge = if (active) {
-                game.currentTurn.darts.map { it.points }
-            } else {
-                game.lastTurnThrows(player)
-            }
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (active) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
+        val tabs = listOf(
+            Triple(NavTab.PLAY, Icons.Default.SportsEsports, "PLAY"),
+            Triple(NavTab.HISTORY, Icons.Default.History, "HISTORY"),
+            Triple(NavTab.PLAYERS, Icons.Default.Person, "PLAYERS"),
+            Triple(NavTab.SETTINGS, Icons.Default.Settings, "SETTINGS")
+        )
+        tabs.forEach { (tab, icon, label) ->
+            val selected = currentTab == tab
+            NavigationBarItem(
+                selected = selected,
+                onClick = { onTabChange(tab) },
+                icon = { Icon(icon, contentDescription = label) },
+                label = {
+                    Text(label, fontSize = 9.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, letterSpacing = 0.5.sp)
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(player.name)
-                            if (game.setModeEnabled) {
-                                Text(
-                                    "${game.legsWon(player)}",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier
-                                        .background(
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = RoundedCornerShape(6.dp)
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            if (throwsForBadge.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    throwsForBadge.forEach { value ->
-                                        ChipText(value.toString())
-                                    }
-                                    if (throwsForBadge.count() == 3) {
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(horizontal = 2.dp)
-                                                .width(1.dp)
-                                                .height(16.dp)
-                                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
-                                        )
-                                        ChipText(
-                                            text = "${throwsForBadge.sum()}",
-                                            emphasized = true
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("${player.score}", fontWeight = FontWeight.SemiBold)
-                        val average = game.legAverage(player) ?: 0.0
-                        Text(
-                            text = "⌀ ${"%.1f".format(average)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+            )
         }
     }
-}
-
-@Composable
-private fun ChipText(text: String, emphasized: Boolean = false, modifier: Modifier = Modifier) {
-    val background = if (emphasized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val foreground = if (emphasized) Color.White else MaterialTheme.colorScheme.onSurface
-    Text(
-        text = text,
-        color = foreground,
-        fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Normal,
-        modifier = modifier
-            .background(background, RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    )
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun SettingsDialog(
-    selectedThemeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit,
-    selectedColorTheme: AppColorTheme,
-    onColorThemeChange: (AppColorTheme) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var pendingThemeMode by remember(selectedThemeMode) { mutableStateOf(selectedThemeMode) }
-    var pendingColorTheme by remember(selectedColorTheme) { mutableStateOf(selectedColorTheme) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = pendingThemeMode == AppThemeMode.SYSTEM,
-                        onClick = { pendingThemeMode = AppThemeMode.SYSTEM },
-                        label = { Text(AppThemeMode.SYSTEM.label) }
-                    )
-                    FilterChip(
-                        selected = pendingThemeMode == AppThemeMode.LIGHT,
-                        onClick = { pendingThemeMode = AppThemeMode.LIGHT },
-                        label = { Text("Light") }
-                    )
-                    FilterChip(
-                        selected = pendingThemeMode == AppThemeMode.DARK,
-                        onClick = { pendingThemeMode = AppThemeMode.DARK },
-                        label = { Text("Dark") }
-                    )
-                }
-                Text("Color Theme", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AppColorTheme.entries.forEach { appTheme ->
-                        FilterChip(
-                            selected = pendingColorTheme == appTheme,
-                            onClick = { pendingColorTheme = appTheme },
-                            label = { Text(appTheme.label) }
-                        )
-                    }
-                }
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onThemeModeChange(pendingThemeMode)
-                    onColorThemeChange(pendingColorTheme)
-                    onDismiss()
-                }
-            ) { Text("Save") }
-        }
-    )
-}
-
-@Composable
-private fun WinnerDialog(
-    winnerName: String,
-    isSetWin: Boolean,
-    onUndoWin: () -> Unit,
-    onNewLegRandom: () -> Unit,
-    onStartNewGame: () -> Unit
-) {
-    val title = if (isSetWin) "Set Won" else "Leg Won"
-    val subtitle = if (isSetWin) "Set finished. Choose next action." else "Leg finished. Choose next action."
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .zIndex(20f),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 8.dp,
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(winnerName, fontWeight = FontWeight.SemiBold)
-                    Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onUndoWin) { Text("Back") }
-                    if (!isSetWin) {
-                        TextButton(onClick = onNewLegRandom) { Text("New Leg (Random)") }
-                    }
-                    TextButton(onClick = onStartNewGame) {
-                        Text(if (!isSetWin) "New Game" else "Start New Game")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun NewGameDialog(
-    setupPlayers: MutableList<SetupPlayer>,
-    finishRule: FinishRule,
-    onFinishRuleChange: (FinishRule) -> Unit,
-    inRule: InRule,
-    onInRuleChange: (InRule) -> Unit,
-    startScore: StartScoreOption,
-    onStartScoreChange: (StartScoreOption) -> Unit,
-    setModeEnabled: Boolean,
-    onSetModeChange: (Boolean) -> Unit,
-    legsToWin: Int,
-    onLegsToWinChange: (Int) -> Unit,
-    onPlayerCountChange: (Int) -> Unit,
-    onCancel: () -> Unit,
-    onStart: () -> Unit
-) {
-    var draggedIndex by remember { mutableStateOf<Int?>(null) }
-    var draggedOffsetY by remember { mutableStateOf(0f) }
-    val rowHeightPx = 76f
-
-    fun movePlayer(from: Int, to: Int) {
-        if (from == to || from !in setupPlayers.indices || to !in setupPlayers.indices) return
-        val item = setupPlayers.removeAt(from)
-        setupPlayers.add(to, item)
-    }
-
-    AlertDialog(
-        onDismissRequest = {},
-        title = { Text("New Game") },
-        text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Players: ${setupPlayers.size}")
-                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size - 1) }) { Text("-") }
-                    OutlinedButton(onClick = { onPlayerCountChange(setupPlayers.size + 1) }) { Text("+") }
-                }
-                Text("Game")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StartScoreOption.entries.forEach { option ->
-                        FilterChip(
-                            selected = startScore == option,
-                            onClick = { onStartScoreChange(option) },
-                            label = { Text(option.label) }
-                        )
-                    }
-                }
-                Text("Finish Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FinishRule.entries.forEach { rule ->
-                        FilterChip(
-                            selected = finishRule == rule,
-                            onClick = { onFinishRuleChange(rule) },
-                            label = { Text(rule.label) }
-                        )
-                    }
-                }
-                Text("In Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InRule.entries.forEach { rule ->
-                        FilterChip(
-                            selected = inRule == rule,
-                            onClick = { onInRuleChange(rule) },
-                            label = { Text(rule.label) }
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(
-                        selected = setModeEnabled,
-                        onClick = { onSetModeChange(!setModeEnabled) },
-                        label = { Text("Set Mode") }
-                    )
-                    if (setModeEnabled) {
-                        Text("Legs: $legsToWin")
-                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin - 1) }) { Text("-") }
-                        OutlinedButton(onClick = { onLegsToWinChange(legsToWin + 1) }) { Text("+") }
-                    }
-                }
-                Text("Player Order")
-                repeat(setupPlayers.size) { index ->
-                    val player = setupPlayers[index]
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                translationY = if (draggedIndex == index) draggedOffsetY else 0f
-                            }
-                            .zIndex(if (draggedIndex == index) 1f else 0f)
-                            .pointerInput(index) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        draggedIndex = index
-                                        draggedOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggedIndex = null
-                                        draggedOffsetY = 0f
-                                    },
-                                    onDragEnd = {
-                                        draggedIndex = null
-                                        draggedOffsetY = 0f
-                                    },
-                                    onDrag = { _, dragAmount ->
-                                        var currentIndex = draggedIndex ?: return@detectDragGesturesAfterLongPress
-                                        draggedOffsetY += dragAmount.y
-
-                                        while (draggedOffsetY > rowHeightPx && currentIndex < setupPlayers.lastIndex) {
-                                            movePlayer(currentIndex, currentIndex + 1)
-                                            currentIndex += 1
-                                            draggedOffsetY -= rowHeightPx
-                                        }
-                                        while (draggedOffsetY < -rowHeightPx && currentIndex > 0) {
-                                            movePlayer(currentIndex, currentIndex - 1)
-                                            currentIndex -= 1
-                                            draggedOffsetY += rowHeightPx
-                                        }
-                                        draggedIndex = currentIndex
-                                    }
-                                )
-                            }
-                    ) {
-                        OutlinedTextField(
-                            value = player.name,
-                            onValueChange = { setupPlayers[index] = player.copy(name = it) },
-                            label = { Text(player.defaultName) },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            painter = painterResource(id = android.R.drawable.ic_menu_sort_by_size),
-                            contentDescription = "Drag Handle",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onCancel,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) { Text("Cancel") }
-        },
-        confirmButton = { TextButton(onClick = onStart) { Text("Start") } }
-    )
 }
 
 private const val APP_PREFS = "dartscorer_android_prefs"
-private const val KEY_SETUP_PLAYER_NAMES = "setup_player_names"
+private const val KEY_SETUP_PLAYER_IDS = "setup_player_ids"
 private const val KEY_SETUP_FINISH_RULE = "setup_finish_rule"
 private const val KEY_SETUP_IN_RULE = "setup_in_rule"
 private const val KEY_SETUP_START_SCORE = "setup_start_score"
 private const val KEY_SETUP_SET_MODE = "setup_set_mode_enabled"
 private const val KEY_SETUP_LEGS_TO_WIN = "setup_legs_to_win"
-private const val NAME_DELIMITER = "\u001F"
+private const val KEY_SAVED_PLAYERS = "saved_players_v2"
