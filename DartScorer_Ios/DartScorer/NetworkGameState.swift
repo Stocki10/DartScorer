@@ -49,6 +49,7 @@ struct NetworkGameState: Codable {
     let winner: Player?
     let setWinner: Player?
     let statusMessage: String?
+    let gameMode: String
     let finishRule: String
     let inRule: String
     let startingScore: Int

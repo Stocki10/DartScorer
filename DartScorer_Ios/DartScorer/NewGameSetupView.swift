@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
+    @Binding var gameMode: GameMode
     @Binding var finishRule: FinishRule
     @Binding var inRule: InRule
     @Binding var startScore: StartScoreOption
@@ -23,6 +24,10 @@ struct NewGameSetupView: View {
     private var maxPlayers: Int {
         guard session.role == .host, !session.connectedPeers.isEmpty else { return 5 }
         return min(5, session.connectedPeers.count + 1)
+    }
+
+    private var minimumPlayers: Int {
+        gameMode == .practice ? 1 : 2
     }
 
     var body: some View {
@@ -76,46 +81,72 @@ struct NewGameSetupView: View {
         }
         .onAppear {
             if setupPlayers.isEmpty {
-                setupPlayers = [
-                    SetupPlayer(name: "Player 1", defaultName: "Player 1"),
-                    SetupPlayer(name: "Player 2", defaultName: "Player 2")
-                ]
+                setupPlayers = gameMode == .practice
+                    ? [SetupPlayer(name: "Player 1", defaultName: "Player 1")]
+                    : [
+                        SetupPlayer(name: "Player 1", defaultName: "Player 1"),
+                        SetupPlayer(name: "Player 2", defaultName: "Player 2")
+                    ]
             }
             if session.role != .none {
                 multiplayerInputMode = session.inputMode
                 multiplayerUndoPermission = session.undoPermission
             }
         }
+        .onChange(of: gameMode) { _, mode in
+            if mode == .practice {
+                setModeEnabled = false
+                legsToWin = 1
+                if setupPlayers.isEmpty {
+                    setupPlayers = [SetupPlayer(name: "Player 1", defaultName: "Player 1")]
+                }
+            } else if setupPlayers.count < 2 {
+                setupPlayers.append(SetupPlayer(name: "Player 2", defaultName: "Player 2"))
+            }
+        }
     }
 
     private var gameSettingsSection: some View {
         Section("Game Settings") {
-            Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: 2...maxPlayers)
-
-            Picker("Game", selection: $startScore) {
-                ForEach(StartScoreOption.allCases) { option in
-                    Text(option.label).tag(option)
+            Picker("Mode", selection: $gameMode) {
+                ForEach(GameMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
                 }
             }
             .pickerStyle(.menu)
 
-            Picker("Finish Mode", selection: $finishRule) {
-                ForEach(FinishRule.allCases) { rule in
-                    Text(rule.rawValue).tag(rule)
-                }
-            }
-            .pickerStyle(.menu)
+            Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: minimumPlayers...maxPlayers)
 
-            Picker("In Mode", selection: $inRule) {
-                ForEach(InRule.allCases) { rule in
-                    Text(rule.rawValue).tag(rule)
+            if gameMode == .x01 {
+                Picker("Game", selection: $startScore) {
+                    ForEach(StartScoreOption.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
                 }
-            }
-            .pickerStyle(.menu)
+                .pickerStyle(.menu)
 
-            Toggle("Set Mode", isOn: $setModeEnabled)
-            if setModeEnabled {
-                Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
+                Picker("Finish Mode", selection: $finishRule) {
+                    ForEach(FinishRule.allCases) { rule in
+                        Text(rule.rawValue).tag(rule)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Picker("In Mode", selection: $inRule) {
+                    ForEach(InRule.allCases) { rule in
+                        Text(rule.rawValue).tag(rule)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Toggle("Set Mode", isOn: $setModeEnabled)
+                if setModeEnabled {
+                    Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
+                }
+            } else {
+                Text("Practice keeps a running total and rotates after every three darts.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -290,7 +321,7 @@ struct NewGameSetupView: View {
         Binding(
             get: { setupPlayers.count },
             set: { newValue in
-                let clamped = min(max(2, newValue), maxPlayers)
+                let clamped = min(max(minimumPlayers, newValue), maxPlayers)
                 if clamped > setupPlayers.count {
                     let start = setupPlayers.count + 1
                     for index in start...clamped {
