@@ -8,6 +8,8 @@ struct ContentView: View {
     @AppStorage("appAccentRed") private var appAccentRed = AppAccentColor.defaultRed
     @AppStorage("appAccentGreen") private var appAccentGreen = AppAccentColor.defaultGreen
     @AppStorage("appAccentBlue") private var appAccentBlue = AppAccentColor.defaultBlue
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("defaultProfileID") private var defaultProfileID = ""
 
     private var appThemeMode: AppThemeMode {
         AppThemeMode(rawValue: appThemeModeRaw) ?? .light
@@ -22,15 +24,45 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            DartsGameView(game: game, session: session, profileStore: profileStore)
-                .navigationTitle("DartScorer")
-                .navigationBarTitleDisplayMode(.inline)
+        Group {
+            if hasCompletedOnboarding {
+                NavigationStack {
+                    DartsGameView(game: game, session: session, profileStore: profileStore)
+                        .navigationTitle("DartScorer")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            } else {
+                Color.clear
+                    .ignoresSafeArea()
+            }
         }
         .preferredColorScheme(appThemeMode.colorScheme)
         .tint(appAccentColor)
+        .fullScreenCover(isPresented: onboardingPresented) {
+            FirstLaunchProfileSetupView(
+                onCreate: createOnboardingProfile,
+                onSkip: completeOnboardingWithoutProfile
+            )
+        }
         .onAppear {
             session.configure(game: game, profileStore: profileStore)
         }
+    }
+
+    private var onboardingPresented: Binding<Bool> {
+        Binding(
+            get: { !hasCompletedOnboarding },
+            set: { if !$0 { hasCompletedOnboarding = true } }
+        )
+    }
+
+    private func createOnboardingProfile(name: String, colorHex: String) {
+        let profile = profileStore.createProfile(name: name, colorHex: colorHex)
+        defaultProfileID = profile.id.uuidString
+        hasCompletedOnboarding = true
+    }
+
+    private func completeOnboardingWithoutProfile() {
+        hasCompletedOnboarding = true
     }
 }

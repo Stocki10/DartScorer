@@ -24,6 +24,8 @@
 "Close settings" = "Close settings";
 "Closed all targets and finished ahead." = "Closed all targets and finished ahead.";
 "Color" = "Color";
+"Create Profile" = "Create Profile";
+"Create your player profile" = "Create your player profile";
 "Completed games will appear here." = "Completed games will appear here.";
 "Connected Devices (%@/4)" = "Connected Devices (%@/4)";
 "Connected to %@" = "Connected to %@";
@@ -116,6 +118,7 @@
 "Practice mode" = "Practice mode";
 "Practice session." = "Practice session.";
 "Profile" = "Profile";
+"Profile Color" = "Profile Color";
 "Profiles" = "Profiles";
 "Quick" = "Quick";
 "Quick score is unavailable in Cricket." = "Quick score is unavailable in Cricket.";
@@ -140,6 +143,7 @@
 "Start on %@ and check out with %@, %@ rules." = "Start on %@ and check out with %@, %@ rules.";
 "Started" = "Started";
 "Stats" = "Stats";
+"Skip for now" = "Skip for now";
 "Finishing" = "Finishing";
 "Stop Local Multiplayer" = "Stop Local Multiplayer";
 "System" = "System";
@@ -148,6 +152,7 @@
 "This will end the session for all connected devices." = "This will end the session for all connected devices.";
 "This will permanently delete all saved game history." = "This will permanently delete all saved game history.";
 "Throws" = "Throws";
+"Track your stats and use your profile in new games." = "Track your stats and use your profile in new games.";
 "Total Legs" = "Total Legs";
 "Triple" = "Triple";
 "Undo" = "Undo";
@@ -158,6 +163,7 @@
 "Winner" = "Winner";
 "Wins" = "Wins";
 "X01" = "X01";
+"Your name" = "Your name";
 "You already started this leg. This will discard current progress." = "You already started this leg. This will discard current progress.";
 "You can only enter your own scores" = "You can only enter your own scores";
 "You enter scores for your opponent" = "You enter scores for your opponent";
