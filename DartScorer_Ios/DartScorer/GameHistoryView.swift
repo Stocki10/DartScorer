@@ -58,6 +58,9 @@ private struct GameRecordRow: View {
     }
 
     private var formatLabel: String {
+        if record.finishRule == GameMode.practice.rawValue {
+            return record.practiceMode.map(L10n.localizedStoredRule) ?? L10n.localizedStoredRule(record.finishRule)
+        }
         let localizedRule = L10n.localizedStoredRule(record.finishRule)
         return record.startingScore > 0 ? "\(record.startingScore) • \(localizedRule)" : localizedRule
     }
@@ -90,6 +93,8 @@ private struct GameRecordRow: View {
 private struct GameRecordDetailView: View {
     let record: GameRecord
     @Environment(\.dismiss) private var dismiss
+    @State private var shareItems: [Any] = []
+    @State private var isShowingShareSheet = false
 
     private var isCricket: Bool {
         record.finishRule == "Cricket"
@@ -108,6 +113,9 @@ private struct GameRecordDetailView: View {
     }
 
     private var formatLabel: String {
+        if record.finishRule == GameMode.practice.rawValue {
+            return record.practiceMode.map(L10n.localizedStoredRule) ?? L10n.localizedStoredRule(record.finishRule)
+        }
         let localizedRule = L10n.localizedStoredRule(record.finishRule)
         return record.startingScore > 0 ? "\(record.startingScore) • \(localizedRule)" : localizedRule
     }
@@ -181,7 +189,16 @@ private struct GameRecordDetailView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Back") { dismiss() }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button(L10n.string("Share")) {
+                        shareItems = MatchShareRenderer.shareItems(for: record)
+                        isShowingShareSheet = true
+                    }
+                }
             }
+        }
+        .sheet(isPresented: $isShowingShareSheet) {
+            ShareSheet(items: shareItems)
         }
     }
 }

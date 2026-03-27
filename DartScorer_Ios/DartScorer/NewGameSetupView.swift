@@ -3,6 +3,7 @@ import SwiftUI
 struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
     @Binding var gameMode: GameMode
+    @Binding var practiceMode: PracticeMode
     @Binding var finishRule: FinishRule
     @Binding var inRule: InRule
     @Binding var startScore: StartScoreOption
@@ -35,7 +36,7 @@ struct NewGameSetupView: View {
         case .x01:
             return startScore.label
         case .practice:
-            return GameMode.practice.label
+            return practiceMode.label
         case .cricket:
             return GameMode.cricket.label
         }
@@ -48,7 +49,16 @@ struct NewGameSetupView: View {
             let outText = finishRule == .doubleOut ? L10n.string("double-out") : L10n.string("single-out")
             return L10n.format("Start on %@ and check out with %@, %@ rules.", startScore.label, inText, outText)
         case .practice:
-            return L10n.string("Score keeps going up. Turns rotate after three darts and there is no bust or checkout.")
+            switch practiceMode {
+            case .scoringDrill:
+                return L10n.string("Score keeps going up. Turns rotate after three darts and there is no bust or checkout.")
+            case .checkoutPractice:
+                return L10n.string("Get a random checkout target. Finish it within the visit to score a success.")
+            case .doublesPractice:
+                return L10n.string("A random double is called. Hit it within the visit to score a success.")
+            case .aroundTheClock:
+                return L10n.string("Work through 1 to 20 and Bull in order. Any multiplier counts for the current target.")
+            }
         case .cricket:
             return L10n.string("Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open.")
         }
@@ -189,6 +199,13 @@ struct NewGameSetupView: View {
                         in: 1...10
                     )
                 }
+            } else if gameMode == .practice {
+                Picker("Practice Mode", selection: $practiceMode) {
+                    ForEach(PracticeMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
             }
         }
     }
