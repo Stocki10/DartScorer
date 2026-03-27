@@ -953,7 +953,7 @@ private extension DartsGame {
     }
 
     func appendThrowToHistory(playerID: UUID, points: Int) {
-        var values = lastTurnThrowsByPlayerID[playerID] ?? []
+        var values: [Int] = currentTurn.dartsUsed == 0 ? [] : (lastTurnThrowsByPlayerID[playerID] ?? [])
         values.append(points)
         if values.count > 3 {
             values = Array(values.suffix(3))

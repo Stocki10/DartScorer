@@ -233,7 +233,7 @@ struct ScoreboardSection: View {
                                     .background(Color(.tertiarySystemBackground))
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
                             }
-                            if throwsForBadge.count == 3 {
+                            if throwsForBadge.count > 1 {
                                 Rectangle()
                                     .fill(Color.secondary.opacity(0.35))
                                     .frame(width: 1, height: 16)
@@ -331,13 +331,10 @@ struct MultiplierPickerView: View {
 }
 
 struct QuickScorePadView: View {
-    @Binding var scoreText: String
-    @Binding var isShowingManualInput: Bool
     let isInputLocked: Bool
     let hasWinner: Bool
     let isVisitOpenInThrowsMode: Bool
     let onQuickScoreTap: (Int) -> Void
-    let onSubmitManualScore: () -> Void
     let onNoScoreTap: () -> Void
 
     private let primaryQuickScores = [60, 100, 140, 180]
@@ -371,32 +368,21 @@ struct QuickScorePadView: View {
                     .disabled(isDisabled)
                 }
 
-                Button("•••") {
-                    isShowingManualInput.toggle()
-                }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .disabled(hasWinner || isInputLocked)
+                Color.clear
+                    .frame(maxWidth: .infinity)
 
                 Button {
                     onNoScoreTap()
                 } label: {
-                    Text("No Score")
+                    Text("No\nScore")
                         .font(.footnote)
-                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.8)
                 }
                 .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
                 .disabled(hasWinner || isInputLocked)
-            }
-
-            if isShowingManualInput {
-                TextField("Enter score", text: $scoreText)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(isDisabled)
-                    .onSubmit(onSubmitManualScore)
+                .frame(maxWidth: .infinity, minHeight: 44)
             }
 
             if isVisitOpenInThrowsMode {
