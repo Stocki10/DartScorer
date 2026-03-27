@@ -59,7 +59,9 @@ struct NewGameSetupView: View {
             Form {
                 gameSettingsSection
                 playerOrderSection
-                multiplayerSection
+                if AppFeatureFlags.localMultiplayerEnabled {
+                    multiplayerSection
+                }
             }
             .navigationTitle("New Game")
             .toolbar {
