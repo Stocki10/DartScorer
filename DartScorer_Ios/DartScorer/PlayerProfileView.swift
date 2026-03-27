@@ -63,11 +63,11 @@ private struct ProfileRow: View {
                 Text(profile.name)
                     .fontWeight(.semibold)
                 if let avg = profile.stats.legAverage {
-                    Text("Avg \(String(format: "%.1f", avg))  ·  \(profile.stats.gamesPlayed) games")
+                    Text(L10n.format("Avg %@  ·  %@ games", L10n.decimal(avg), "\(profile.stats.gamesPlayed)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("\(profile.stats.gamesPlayed) games")
+                    Text(L10n.format("%@ games", "\(profile.stats.gamesPlayed)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -114,41 +114,41 @@ struct ProfileEditView: View {
 
                 if isEditing, let stats = profile?.stats, stats.gamesPlayed > 0 {
                     Section("Stats") {
-                        statGroup(title: "Overview") {
-                            statCard(label: "Games", value: "\(stats.gamesPlayed)")
-                            statCard(label: "Wins", value: "\(stats.gamesWon)")
+                        statGroup(title: L10n.string("Overview")) {
+                            statCard(label: L10n.string("Games"), value: "\(stats.gamesPlayed)")
+                            statCard(label: L10n.string("Wins"), value: "\(stats.gamesWon)")
                             if let rate = stats.winRate {
-                                statCard(label: "Win Rate", value: "\(Int(rate * 100))%")
+                                statCard(label: L10n.string("Win Rate"), value: L10n.percent(rate))
                             }
                             if let avg = stats.legAverage {
-                                statCard(label: "Average", value: String(format: "%.1f", avg))
+                                statCard(label: L10n.string("Average"), value: L10n.decimal(avg))
                             }
                         }
 
-                        statGroup(title: "Scoring") {
+                        statGroup(title: L10n.string("Scoring")) {
                             if let firstNineAverage = stats.firstNineAverage {
-                                statCard(label: "First 9 Avg", value: String(format: "%.1f", firstNineAverage))
+                                statCard(label: L10n.string("First 9 Avg"), value: L10n.decimal(firstNineAverage))
                             }
                             if stats.highestTurnScore > 0 {
-                                statCard(label: "Best Turn", value: "\(stats.highestTurnScore)")
+                                statCard(label: L10n.string("Best Turn"), value: "\(stats.highestTurnScore)")
                             }
                             if stats.highestScore > 0 {
-                                statCard(label: "Highest Score", value: "\(stats.highestScore)")
+                                statCard(label: L10n.string("Highest Score"), value: "\(stats.highestScore)")
                             }
                             if stats.score180Count > 0 {
-                                statCard(label: "180 Count", value: "\(stats.score180Count)")
+                                statCard(label: L10n.string("180 Count"), value: "\(stats.score180Count)")
                             }
                             if stats.score140PlusCount > 0 {
-                                statCard(label: "140+ Count", value: "\(stats.score140PlusCount)")
+                                statCard(label: L10n.string("140+ Count"), value: "\(stats.score140PlusCount)")
                             }
                         }
 
-                        statGroup(title: "Finishing") {
+                        statGroup(title: L10n.string("Finishing")) {
                             if let checkoutPercentage = stats.checkoutPercentage {
-                                statCard(label: "Checkout %", value: "\(Int(checkoutPercentage * 100))%")
+                                statCard(label: L10n.string("Checkout %"), value: L10n.percent(checkoutPercentage))
                             }
                             if stats.highestCheckout > 0 {
-                                statCard(label: "Best Checkout", value: "\(stats.highestCheckout)")
+                                statCard(label: L10n.string("Best Checkout"), value: "\(stats.highestCheckout)")
                             }
                         }
                     }

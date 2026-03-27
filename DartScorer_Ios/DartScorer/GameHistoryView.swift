@@ -58,7 +58,8 @@ private struct GameRecordRow: View {
     }
 
     private var formatLabel: String {
-        record.startingScore > 0 ? "\(record.startingScore) • \(record.finishRule)" : record.finishRule
+        let localizedRule = L10n.localizedStoredRule(record.finishRule)
+        return record.startingScore > 0 ? "\(record.startingScore) • \(localizedRule)" : localizedRule
     }
 
     var body: some View {
@@ -107,18 +108,19 @@ private struct GameRecordDetailView: View {
     }
 
     private var formatLabel: String {
-        record.startingScore > 0 ? "\(record.startingScore) • \(record.finishRule)" : record.finishRule
+        let localizedRule = L10n.localizedStoredRule(record.finishRule)
+        return record.startingScore > 0 ? "\(record.startingScore) • \(localizedRule)" : localizedRule
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Match Summary") {
-                    HistoryMetricRow(title: "Date", value: record.date.formatted(date: .abbreviated, time: .omitted))
-                    HistoryMetricRow(title: "Format", value: formatLabel)
-                    HistoryMetricRow(title: "Winner", value: winner?.name ?? "—")
+                    HistoryMetricRow(title: L10n.string("Date"), value: record.date.formatted(date: .abbreviated, time: .omitted))
+                    HistoryMetricRow(title: L10n.string("Format"), value: formatLabel)
+                    HistoryMetricRow(title: L10n.string("Winner"), value: winner?.name ?? L10n.string("—"))
                     if record.legs.count > 1 {
-                        HistoryMetricRow(title: "Total Legs", value: "\(record.legs.count)")
+                        HistoryMetricRow(title: L10n.string("Total Legs"), value: "\(record.legs.count)")
                     }
                 }
 
@@ -147,7 +149,7 @@ private struct GameRecordDetailView: View {
                                     .fontWeight(result.isWinner ? .semibold : .regular)
                                 Spacer()
                                 if record.legs.count > 1 {
-                                    HistoryInlineBadge(text: "Legs won: \(legWins(for: result.id))")
+                                    HistoryInlineBadge(text: L10n.format("Legs won: %@", "\(legWins(for: result.id))"))
                                 }
                             }
 
@@ -155,14 +157,14 @@ private struct GameRecordDetailView: View {
                                 if isCricket {
                                     HistoryStatBlock(title: "Score", value: "\(result.totalPointsScored)")
                                 } else {
-                                    HistoryStatBlock(title: "Average", value: String(format: "%.1f", result.average))
+                                    HistoryStatBlock(title: "Average", value: L10n.decimal(result.average))
                                 }
                                 HistoryStatBlock(title: "Darts", value: "\(result.totalDartsThrown)")
                                 HistoryStatBlock(title: "Best Turn", value: "\(result.highestTurnScore)")
                                 if isCricket {
                                     HistoryStatBlock(
                                         title: "Scoring Avg",
-                                        value: String(format: "%.1f", result.average)
+                                        value: L10n.decimal(result.average)
                                     )
                                 } else {
                                     HistoryStatBlock(title: "Best Finish", value: "\(result.highestCheckout)")
@@ -193,7 +195,7 @@ private struct LegRecordRow: View {
     }
 
     private var legTitle: String {
-        totalLegs == 1 ? "Leg" : "Leg \(leg.legNumber)"
+        totalLegs == 1 ? L10n.string("Leg") : L10n.format("Leg %@", "\(leg.legNumber)")
     }
 
     var body: some View {
@@ -209,18 +211,18 @@ private struct LegRecordRow: View {
             }
 
             if let route = leg.winningCheckoutRoute {
-                Text("Finish: \(route)")
+                Text(L10n.format("Finish: %@", route))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             if let winner {
                 HStack(spacing: 16) {
-                    Text("Darts \(winner.dartsThrown)")
+                    Text(L10n.format("Darts %@", "\(winner.dartsThrown)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let firstNineAverage = winner.firstNineAverage {
-                        Text("First 9 \(String(format: "%.1f", firstNineAverage))")
+                        Text(L10n.format("First 9 %@", L10n.decimal(firstNineAverage)))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -240,7 +242,7 @@ private struct LegRecordDetailView: View {
     }
 
     private var legTitle: String {
-        totalLegs == 1 ? "Leg" : "Leg \(leg.legNumber)"
+        totalLegs == 1 ? L10n.string("Leg") : L10n.format("Leg %@", "\(leg.legNumber)")
     }
 
     var body: some View {
@@ -303,10 +305,10 @@ private struct LegRecordDetailView: View {
 
                         HStack(spacing: 18) {
                             HistoryStatBlock(title: "Darts", value: "\(result.dartsThrown)")
-                            HistoryStatBlock(title: "Average", value: String(format: "%.1f", result.average))
+                            HistoryStatBlock(title: "Average", value: L10n.decimal(result.average))
                             HistoryStatBlock(
                                 title: "First 9",
-                                value: result.firstNineAverage.map { String(format: "%.1f", $0) } ?? "—"
+                                value: result.firstNineAverage.map { L10n.decimal($0) } ?? L10n.string("—")
                             )
                         }
 

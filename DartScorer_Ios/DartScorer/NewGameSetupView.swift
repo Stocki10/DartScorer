@@ -35,22 +35,22 @@ struct NewGameSetupView: View {
         case .x01:
             return startScore.label
         case .practice:
-            return "Practice"
+            return GameMode.practice.label
         case .cricket:
-            return "Cricket"
+            return GameMode.cricket.label
         }
     }
 
     private var modeDescriptionText: String {
         switch gameMode {
         case .x01:
-            let inText = inRule == .doubleIn ? "double-in" : "default-in"
-            let outText = finishRule == .doubleOut ? "double-out" : "single-out"
-            return "Start on \(startScore.label) and check out with \(inText), \(outText) rules."
+            let inText = inRule == .doubleIn ? L10n.string("double-in") : L10n.string("default-in")
+            let outText = finishRule == .doubleOut ? L10n.string("double-out") : L10n.string("single-out")
+            return L10n.format("Start on %@ and check out with %@, %@ rules.", startScore.label, inText, outText)
         case .practice:
-            return "Score keeps going up. Turns rotate after three darts and there is no bust or checkout."
+            return L10n.string("Score keeps going up. Turns rotate after three darts and there is no bust or checkout.")
         case .cricket:
-            return "Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open."
+            return L10n.string("Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open.")
         }
     }
 
@@ -132,14 +132,18 @@ struct NewGameSetupView: View {
 
     private var gameSettingsSection: some View {
         Section("Game Settings") {
-            Picker("Mode", selection: $gameMode) {
-                ForEach(GameMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
+                Picker("Mode", selection: $gameMode) {
+                    ForEach(GameMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
                 }
-            }
             .pickerStyle(.menu)
 
-            Stepper("Players: \(setupPlayers.count)", value: playerCountBinding, in: minimumPlayers...maxPlayers)
+            Stepper(
+                L10n.format("Players: %@", "\(setupPlayers.count)"),
+                value: playerCountBinding,
+                in: minimumPlayers...maxPlayers
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(modeDescriptionTitle)
@@ -163,21 +167,25 @@ struct NewGameSetupView: View {
 
                 Picker("Finish Mode", selection: $finishRule) {
                     ForEach(FinishRule.allCases) { rule in
-                        Text(rule.rawValue).tag(rule)
+                        Text(rule.label).tag(rule)
                     }
                 }
                 .pickerStyle(.menu)
 
                 Picker("In Mode", selection: $inRule) {
                     ForEach(InRule.allCases) { rule in
-                        Text(rule.rawValue).tag(rule)
+                        Text(rule.label).tag(rule)
                     }
                 }
                 .pickerStyle(.menu)
 
                 Toggle("Set Mode", isOn: $setModeEnabled)
                 if setModeEnabled {
-                    Stepper("Legs to Win: \(legsToWin)", value: $legsToWin, in: 1...10)
+                    Stepper(
+                        L10n.format("Legs to Win: %@", "\(legsToWin)"),
+                        value: $legsToWin,
+                        in: 1...10
+                    )
                 }
             }
         }
@@ -185,7 +193,7 @@ struct NewGameSetupView: View {
 
     private var playerOrderSection: some View {
         Section("Player Order") {
-            Text("Drag rows to set the throw sequence.")
+            Text(L10n.string("Drag rows to set the throw sequence."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 

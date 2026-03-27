@@ -13,7 +13,7 @@ struct DartTarget: Codable, Identifiable, Hashable {
     }
 
     var label: String {
-        if isBull { return "Bull" }
+        if isBull { return L10n.string("Bull") }
         if isOuterBull { return "25" }
         switch multiplier {
         case .single:

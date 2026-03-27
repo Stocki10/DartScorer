@@ -6,7 +6,7 @@ enum ScoreEntryMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var label: String { rawValue }
+    var label: String { L10n.string(rawValue) }
 }
 
 struct CricketBoardSection: View {
@@ -30,7 +30,7 @@ struct CricketBoardSection: View {
     }
 
     private func visitLabel(for values: [Int]) -> String {
-        guard !values.isEmpty else { return "No throw" }
+        guard !values.isEmpty else { return L10n.string("No throw") }
         return values.map(String.init).joined(separator: " ")
     }
 
@@ -255,7 +255,7 @@ struct ScoreboardSection: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(player.score)")
                             .fontWeight(.semibold)
-                        Text("⌀ \(String(format: "%.1f", legAverage(player) ?? 0.0))")
+                        Text("⌀ \(L10n.decimal(legAverage(player) ?? 0.0))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -277,10 +277,10 @@ struct CheckoutBadgeView: View {
 
     private var label: String {
         if isBogey {
-            return "Bogey — no finish possible"
+            return L10n.string("Bogey — no finish possible")
         }
         if routes.isEmpty {
-            return "No finish available"
+            return L10n.string("No finish available")
         }
         return routes.joined(separator: "   ·   ")
     }
@@ -465,7 +465,7 @@ struct ReconnectBannerView: View {
         VStack {
             HStack(spacing: 8) {
                 ProgressView()
-                Text("Reconnecting…")
+                Text(L10n.string("Reconnecting…"))
                     .font(.subheadline.weight(.medium))
             }
             .padding(.horizontal, 16)
@@ -476,7 +476,7 @@ struct ReconnectBannerView: View {
 
             Spacer()
 
-            Button("Abort Connection", action: onAbort)
+            Button(L10n.string("Abort Connection"), action: onAbort)
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 .padding(.bottom, 24)
