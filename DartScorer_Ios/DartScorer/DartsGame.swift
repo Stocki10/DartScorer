@@ -7,6 +7,17 @@ enum GameMode: String, CaseIterable, Identifiable, Codable {
     case cricket = "Cricket"
 
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .x01:
+            return "X01"
+        case .practice:
+            return L10n.string("Practice")
+        case .cricket:
+            return L10n.string("Cricket")
+        }
+    }
 }
 
 enum CricketTarget: Int, CaseIterable, Identifiable, Codable {
@@ -21,7 +32,7 @@ enum CricketTarget: Int, CaseIterable, Identifiable, Codable {
     var id: Int { rawValue }
 
     var label: String {
-        self == .bull ? "Bull" : "\(rawValue)"
+        self == .bull ? L10n.string("Bull") : "\(rawValue)"
     }
 }
 
@@ -30,6 +41,15 @@ enum FinishRule: String, CaseIterable, Identifiable, Codable {
     case singleOut = "Single Out"
 
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .doubleOut:
+            return L10n.string("Double Out")
+        case .singleOut:
+            return L10n.string("Single Out")
+        }
+    }
 }
 
 enum StartScoreOption: Int, CaseIterable, Identifiable {
@@ -49,6 +69,15 @@ enum InRule: String, CaseIterable, Identifiable, Codable {
     case doubleIn = "Double In"
 
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .default:
+            return L10n.string("Default")
+        case .doubleIn:
+            return L10n.string("Double In")
+        }
+    }
 }
 
 final class DartsGame: ObservableObject {
@@ -180,7 +209,7 @@ final class DartsGame: ObservableObject {
         guard remainingDarts > 0 else { return }
 
         guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
-            statusMessage = "Invalid throw."
+            statusMessage = L10n.string("Invalid throw.")
             return
         }
 
@@ -227,13 +256,13 @@ final class DartsGame: ObservableObject {
                 if (legsWonByPlayerID[winningPlayer.id] ?? 0) >= legsToWin {
                     winner = winningPlayer
                     setWinner = winningPlayer
-                    statusMessage = "\(winningPlayer.name) wins the set."
+                    statusMessage = L10n.format("%@ wins the set.", winningPlayer.name)
                 } else {
                     startNewLeg(randomSequence: false, invertedSequence: true)
                 }
             } else {
                 winner = winningPlayer
-                statusMessage = "\(winningPlayer.name) wins the leg."
+                statusMessage = L10n.format("%@ wins the leg.", winningPlayer.name)
             }
             return
         }
@@ -256,20 +285,20 @@ final class DartsGame: ObservableObject {
         }
 
         guard gameMode == .x01 else {
-            statusMessage = "Quick score is unavailable in Cricket."
+            statusMessage = L10n.string("Quick score is unavailable in Cricket.")
             return
         }
         guard winner == nil else { return }
         guard currentTurn.dartsUsed == 0 else {
-            statusMessage = "Finish the current visit in Throws mode."
+            statusMessage = L10n.string("Finish the current visit in Throws mode.")
             return
         }
         guard (1...180).contains(score) else {
-            statusMessage = "Quick scores must be between 1 and 180."
+            statusMessage = L10n.string("Quick scores must be between 1 and 180.")
             return
         }
         guard !(inRule == .doubleIn && currentTurn.openedAtTurnStart == false) else {
-            statusMessage = "Finish the opening double in Throws mode."
+            statusMessage = L10n.string("Finish the opening double in Throws mode.")
             return
         }
 
@@ -316,13 +345,13 @@ final class DartsGame: ObservableObject {
                 if (legsWonByPlayerID[winningPlayer.id] ?? 0) >= legsToWin {
                     winner = winningPlayer
                     setWinner = winningPlayer
-                    statusMessage = "\(winningPlayer.name) wins the set."
+                    statusMessage = L10n.format("%@ wins the set.", winningPlayer.name)
                 } else {
                     startNewLeg(randomSequence: false, invertedSequence: true)
                 }
             } else {
                 winner = winningPlayer
-                statusMessage = "\(winningPlayer.name) wins the leg."
+                statusMessage = L10n.format("%@ wins the leg.", winningPlayer.name)
             }
             return
         }
@@ -1097,12 +1126,12 @@ private extension DartsGame {
         guard remainingDarts > 0 else { return }
 
         guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
-            statusMessage = "Invalid throw."
+            statusMessage = L10n.string("Invalid throw.")
             return
         }
 
         recordSnapshot()
-        statusMessage = "Practice mode"
+        statusMessage = L10n.string("Practice mode")
 
         let player = activePlayer
         appendThrowToHistory(playerID: player.id, points: throwValue.points)
@@ -1126,16 +1155,16 @@ private extension DartsGame {
     func submitPracticeQuickScore(_ score: Int) {
         guard winner == nil else { return }
         guard currentTurn.dartsUsed == 0 else {
-            statusMessage = "Finish the current visit in Throws mode."
+            statusMessage = L10n.string("Finish the current visit in Throws mode.")
             return
         }
         guard (1...180).contains(score) else {
-            statusMessage = "Quick scores must be between 1 and 180."
+            statusMessage = L10n.string("Quick scores must be between 1 and 180.")
             return
         }
 
         recordSnapshot()
-        statusMessage = "Practice mode"
+        statusMessage = L10n.string("Practice mode")
 
         let player = activePlayer
         lastTurnThrowsByPlayerID[player.id] = [score]
@@ -1157,12 +1186,12 @@ private extension DartsGame {
         guard remainingDarts > 0 else { return }
 
         guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
-            statusMessage = "Invalid throw."
+            statusMessage = L10n.string("Invalid throw.")
             return
         }
 
         recordSnapshot()
-        statusMessage = "Close all numbers and finish level or ahead."
+        statusMessage = L10n.string("Close all numbers and finish level or ahead.")
 
         let player = activePlayer
         appendThrowToHistory(playerID: player.id, points: throwValue.points)
@@ -1184,7 +1213,7 @@ private extension DartsGame {
             recordCompletedLeg(winner: winningPlayer, checkoutScore: nil, checkoutRoute: nil)
             winner = winningPlayer
             setWinner = winningPlayer
-            statusMessage = "\(winningPlayer.name) wins Cricket."
+            statusMessage = L10n.format("%@ wins Cricket.", winningPlayer.name)
         }
     }
 

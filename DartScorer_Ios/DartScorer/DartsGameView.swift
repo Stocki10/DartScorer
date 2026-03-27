@@ -63,22 +63,24 @@ struct DartsGameView: View {
     }
 
     private var winnerTitle: String {
-        game.gameMode == .x01 ? (game.setWinner == nil ? "Leg Won" : "Winner") : "Winner"
+        game.gameMode == .x01
+            ? (game.setWinner == nil ? L10n.string("Leg Won") : L10n.string("Winner"))
+            : L10n.string("Winner")
     }
 
     private var winningSubtitle: String {
         if game.gameMode == .practice {
-            return "Practice session."
+            return L10n.string("Practice session.")
         }
         if game.gameMode == .cricket {
-            return "Closed all targets and finished ahead."
+            return L10n.string("Closed all targets and finished ahead.")
         }
         if game.setWinner != nil {
-            return "Match complete."
+            return L10n.string("Match complete.")
         }
-        let outText = game.finishRule == .doubleOut ? "double-out" : "single-out"
-        let inText = game.inRule == .doubleIn ? "double-in" : "default-in"
-        return "Played \(inText), \(outText)."
+        let outText = game.finishRule == .doubleOut ? L10n.string("double-out") : L10n.string("single-out")
+        let inText = game.inRule == .doubleIn ? L10n.string("double-in") : L10n.string("default-in")
+        return L10n.format("Played %@, %@.", inText, outText)
     }
 
     private var visibleStatusMessage: String? {

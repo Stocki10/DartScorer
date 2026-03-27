@@ -11,17 +11,17 @@ enum InputMode: String, Codable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .ownOnly:    return "Own Only"
-        case .othersOnly: return "Others Only (Referee)"
-        case .free:       return "Free"
+        case .ownOnly:    return L10n.string("Own Only")
+        case .othersOnly: return L10n.string("Others Only (Referee)")
+        case .free:       return L10n.string("Free")
         }
     }
 
     var explanation: String {
         switch self {
-        case .ownOnly:    return "You can only enter your own scores"
-        case .othersOnly: return "You enter scores for your opponent"
-        case .free:       return "Any player can enter any score"
+        case .ownOnly:    return L10n.string("You can only enter your own scores")
+        case .othersOnly: return L10n.string("You enter scores for your opponent")
+        case .free:       return L10n.string("Any player can enter any score")
         }
     }
 }
@@ -34,8 +34,8 @@ enum UndoPermission: String, Codable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .anyPlayer: return "Any Player"
-        case .hostOnly:  return "Host Only"
+        case .anyPlayer: return L10n.string("Any Player")
+        case .hostOnly:  return L10n.string("Host Only")
         }
     }
 }

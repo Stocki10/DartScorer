@@ -9,9 +9,9 @@ enum DartMultiplier: Int, CaseIterable, Identifiable, Codable {
 
     var label: String {
         switch self {
-        case .single: return "Single"
-        case .double: return "Double"
-        case .triple: return "Triple"
+        case .single: return L10n.string("Single")
+        case .double: return L10n.string("Double")
+        case .triple: return L10n.string("Triple")
         }
     }
 }
@@ -30,7 +30,7 @@ enum DartSegment: Equatable, Codable {
     var label: String {
         switch self {
         case .number(let value): return "\(value)"
-        case .bull: return "Bull"
+        case .bull: return L10n.string("Bull")
         }
     }
 

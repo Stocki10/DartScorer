@@ -37,7 +37,7 @@ struct QRHostView: View {
                 Text("Share this QR code with other players")
             }
 
-            Section("Connected Devices (\(session.connectedPeers.count + 1)/4)") {
+            Section(L10n.format("Connected Devices (%@/4)", "\(session.connectedPeers.count + 1)")) {
                 Label("This device (Host)", systemImage: "iphone")
                 ForEach(session.connectedPeers, id: \.displayName) { peer in
                     HStack {
@@ -48,7 +48,7 @@ struct QRHostView: View {
                 }
             }
 
-            Section("Player Assignments") {
+            Section(L10n.string("Player Assignments")) {
                 let hostEntry = (id: session.deviceID, name: "This device (Host)")
                 let peerEntries = session.peerDisplayNames.map { (id: $0.key, name: $0.value) }
                     .sorted { $0.name < $1.name }
@@ -191,7 +191,7 @@ struct QRJoinerView: View {
             Text("Waiting for host to start…")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("Connected to \(session.connectedPeers.first?.displayName ?? "host")")
+            Text(L10n.format("Connected to %@", session.connectedPeers.first?.displayName ?? L10n.string("host")))
                 .font(.footnote)
                 .foregroundStyle(.tertiary)
                 .padding(.top, 4)
