@@ -1,100 +1,145 @@
-# DartScorer
+# DartScorer iOS
 
-A clean, feature-complete darts scoring app available on **iOS** and **Android**. Supports 501 and 301, flexible in/out rules, set mode, live checkout suggestions, full undo, local multiplayer, player profiles, and game history.
+`DartScorer` is a SwiftUI darts scoring app for iPhone with support for classic x01 play, Cricket, practice sessions, local multiplayer, player profiles, and match history.
 
----
+## What The App Does
 
-## Features
+- Play `301`, `501`, and other x01 formats with configurable `double in`, `double out`, and set mode rules
+- Play `Cricket` with mark tracking and scoring
+- Run `Practice` sessions for simple scoring drills
+- Track checkout suggestions, leg averages, busts, and winner state live during a match
+- Save completed matches to history with per-leg detail views
+- Store reusable player profiles with persistent stats
+- Connect multiple nearby iPhones for local multiplayer using `MultipeerConnectivity`
+- Switch between throw-by-throw input and quick-score input
 
-### Core Game
-- **2–5 players** with drag-to-reorder throw sequence
-- **501 / 301** starting scores
-- **Double Out / Single Out** finish rules
-- **Double In / Default** start rules
-- **Set mode** — configurable legs to win
-- **Live checkout suggestions** shown above the number pad
-- **Full undo** — step back through every throw
-- **Per-leg stats** — live average and last-turn scores per player
-- **Haptic feedback** on throws, busts, and wins
+## iOS Features
 
-### Local Multiplayer *(iOS)*
-Play on multiple iPhones over a shared local network — no internet required.
-- Host generates a **QR code** that joiners scan to connect instantly
-- Up to **4 devices** (host + 3 joiners) via Apple MultipeerConnectivity
-- Host **assigns each player to a device** before starting; every device then scores for its own player
-- If all guests disconnect, the host is notified and the game ends gracefully
+### Game Modes
 
-### Player Profiles *(iOS)*
-- Create reusable profiles with a **custom name and color**
-- Stats accumulate automatically across games:
-  - Games played & won, win rate
-  - 3-dart average, highest turn score
-  - Highest checkout
-- Profiles are linked to game results so history always shows the right player
+- `X01`
+  - configurable starting score
+  - `default in` / `double in`
+  - `single out` / `double out`
+  - optional set mode with configurable legs to win
+- `Cricket`
+  - marks for `20` through `15` and `Bull`
+  - scoring after closing numbers against open opponents
+- `Practice`
+  - simple cumulative scoring without checkout logic
 
-### Game History *(iOS)*
-- Every completed game is saved automatically
-- Browse past games with per-player results: average, highest turn, checkout percentage
-- History feeds back into player profile stats
+### Match Flow
 
-### Appearance
-- **Theme support** — Light / Dark / System
-- **Custom accent color** via color picker
+- `1–5` players depending on mode
+- full undo support
+- restart leg
+- quick-score shortcuts for common x01 totals
+- haptic feedback for normal throws, warnings, and wins
 
----
+### Profiles And Stats
 
-## Platforms
+Each player profile persists across launches and updates automatically after recorded matches.
 
-| Platform | Stack | Location |
-|----------|-------|----------|
-| iOS 17+ | SwiftUI | `DartScorer_Ios/` |
-| Android | Jetpack Compose | `DartScorer_Android/` |
+Tracked stats include:
 
-Both apps implement the same core game logic independently — there is no shared code between platforms. Multiplayer, Player Profiles, and Game History are currently iOS-only features.
+- games played
+- wins
+- win rate
+- average
+- first 9 average
+- best turn
+- best checkout
+- checkout percentage
+- 180 count
+- 140+ count
+- highest score
 
----
+### Match History
 
-## Getting Started
+- completed matches are saved automatically
+- match detail screens show player summaries and leg results
+- leg detail screens include finishing info and per-player breakdowns
 
-### iOS
+### Local Multiplayer
 
-Open `DartScorer_Ios/DartScorer.xcodeproj` in Xcode, select a simulator or device, and press **Run**.
+- host / join flow over nearby Apple devices
+- QR-based session joining
+- player assignment per device
+- synchronized game state, undo, leg restarts, and profile stat updates
 
-Requirements: Xcode 15+, iOS 17+
+## Project Structure
 
-> **Local Multiplayer** requires physical devices on the same Wi-Fi or Bluetooth range. It does not work in the Simulator.
+### Main iOS App
 
-### Android
+- `DartScorer_Ios/DartScorer.xcodeproj`
+- `DartScorer_Ios/DartScorer/`
+
+### Important Files
+
+- [DartsGame.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/DartsGame.swift)
+  - core game rules, scoring, snapshots, history record building
+- [DartsGameView.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/DartsGameView.swift)
+  - main game screen orchestration
+- [GameScreenComponents.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/GameScreenComponents.swift)
+  - scoreboard, cricket board, input controls
+- [NewGameSetupView.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/NewGameSetupView.swift)
+  - new game setup flow
+- [GameHistory.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/GameHistory.swift)
+  - persisted match and leg history models
+- [GameHistoryView.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/GameHistoryView.swift)
+  - history list and detail screens
+- [PlayerProfile.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/PlayerProfile.swift)
+  - persistent player profiles and stat aggregation
+- [PlayerProfileView.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/PlayerProfileView.swift)
+  - profile management UI
+- [MultipeerSessionManager.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/MultipeerSessionManager.swift)
+  - local multiplayer session handling
+- [NetworkGameState.swift](/Users/leonstockmann/git/DartScorer/DartScorer_Ios/DartScorer/NetworkGameState.swift)
+  - multiplayer wire models
+
+## Requirements
+
+- macOS with Xcode installed
+- Xcode `15+`
+- iOS `17+`
+
+## Running The iOS App
+
+Open the project in Xcode:
 
 ```bash
-cd DartScorer_Android
-./gradlew assembleDebug
+open DartScorer_Ios/DartScorer.xcodeproj
 ```
 
-Requirements: Android Studio, Android SDK 34+
+Or build from the terminal:
 
----
+```bash
+xcodebuild -project DartScorer_Ios/DartScorer.xcodeproj \
+  -scheme DartScorer \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /tmp/DartScorerDerivedData build
+```
 
 ## Running Tests
 
-### iOS
+```bash
+xcodebuild test -project DartScorer_Ios/DartScorer.xcodeproj \
+  -scheme DartScorer \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+Run a single test:
 
 ```bash
-# All tests
-xcodebuild test -project DartScorer_Ios/DartScorer.xcodeproj -scheme DartScorer \
-  -destination 'platform=iOS Simulator,name=iPhone 16'
-
-# Single test
-xcodebuild test -project DartScorer_Ios/DartScorer.xcodeproj -scheme DartScorer \
+xcodebuild test -project DartScorer_Ios/DartScorer.xcodeproj \
+  -scheme DartScorer \
   -destination 'platform=iOS Simulator,name=iPhone 16' \
   -only-testing:DartScorerTests/DartScorerTests/scoreSubtractionOnValidThrow
 ```
 
-### Android
+## Notes
 
-```bash
-cd DartScorer_Android
-./gradlew test                                              # unit tests
-./gradlew connectedAndroidTest                             # instrumented (requires device)
-./gradlew test --tests "com.example.dartscorer_android.DartsGameTest"  # single class
-```
+- local multiplayer requires physical Apple devices; it is not meaningful in the simulator
+- history and profile data are stored locally on-device
+- the iOS app and Android app live in the same repository, but this README is intentionally focused on the iOS app
