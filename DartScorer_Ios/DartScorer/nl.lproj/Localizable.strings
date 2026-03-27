@@ -24,6 +24,8 @@
 "Close settings" = "Instellingen sluiten";
 "Closed all targets and finished ahead." = "Alle doelen gesloten en voor geeindigd.";
 "Color" = "Kleur";
+"Create Profile" = "Profiel aanmaken";
+"Create your player profile" = "Maak je spelersprofiel";
 "Completed games will appear here." = "Voltooide wedstrijden verschijnen hier.";
 "Connected Devices (%@/4)" = "Verbonden apparaten (%@/4)";
 "Connected to %@" = "Verbonden met %@";
@@ -117,6 +119,7 @@
 "Practice mode" = "Oefenmodus";
 "Practice session." = "Oefensessie.";
 "Profile" = "Profiel";
+"Profile Color" = "Profielkleur";
 "Profiles" = "Profielen";
 "Quick" = "Snel";
 "Quick score is unavailable in Cricket." = "Snelle score is niet beschikbaar in Cricket.";
@@ -141,6 +144,7 @@
 "Start on %@ and check out with %@, %@ rules." = "Start op %@ en gooi uit met %@, %@ regels.";
 "Started" = "Begonnen";
 "Stats" = "Statistieken";
+"Skip for now" = "Nu overslaan";
 "Finishing" = "Finishen";
 "Stop Local Multiplayer" = "Lokale multiplayer stoppen";
 "System" = "Systeem";
@@ -149,6 +153,7 @@
 "This will end the session for all connected devices." = "Dit beeindigt de sessie voor alle verbonden apparaten.";
 "This will permanently delete all saved game history." = "Dit verwijdert alle opgeslagen wedstrijdgeschiedenis permanent.";
 "Throws" = "Worpen";
+"Track your stats and use your profile in new games." = "Houd je statistieken bij en gebruik je profiel in nieuwe wedstrijden.";
 "Total Legs" = "Totaal aantal legs";
 "Triple" = "Triple";
 "Undo" = "Ongedaan maken";
@@ -159,6 +164,7 @@
 "Winner" = "Winnaar";
 "Wins" = "Overwinningen";
 "X01" = "X01";
+"Your name" = "Je naam";
 "You already started this leg. This will discard current progress." = "Je bent al aan dit leg begonnen. De huidige voortgang wordt verwijderd.";
 "You can only enter your own scores" = "Je kunt alleen je eigen scores invoeren";
 "You enter scores for your opponent" = "Je voert scores in voor je tegenstander";

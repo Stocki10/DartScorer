@@ -89,6 +89,13 @@ final class PlayerProfileStore: ObservableObject {
 
     init() { load() }
 
+    @discardableResult
+    func createProfile(name: String, colorHex: String) -> PlayerProfile {
+        let profile = PlayerProfile(name: name, colorHex: colorHex)
+        add(profile)
+        return profile
+    }
+
     func add(_ profile: PlayerProfile) {
         profiles.append(profile)
         save()

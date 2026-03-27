@@ -24,6 +24,8 @@
 "Close settings" = "Einstellungen schließen";
 "Closed all targets and finished ahead." = "Alle Felder geschlossen und vorne beendet.";
 "Color" = "Farbe";
+"Create Profile" = "Profil erstellen";
+"Create your player profile" = "Erstelle dein Spielerprofil";
 "Completed games will appear here." = "Abgeschlossene Spiele erscheinen hier.";
 "Connected Devices (%@/4)" = "Verbundene Geräte (%@/4)";
 "Connected to %@" = "Verbunden mit %@";
@@ -116,6 +118,7 @@
 "Practice mode" = "Trainingsmodus";
 "Practice session." = "Trainingssitzung.";
 "Profile" = "Profil";
+"Profile Color" = "Profilfarbe";
 "Profiles" = "Profile";
 "Quick" = "Quick";
 "Quick score is unavailable in Cricket." = "Quick Score ist in Cricket nicht verfügbar.";
@@ -140,6 +143,7 @@
 "Start on %@ and check out with %@, %@ rules." = "Starte bei %@ und spiele mit %@, %@ Regeln.";
 "Started" = "Begonnen";
 "Stats" = "Statistiken";
+"Skip for now" = "Vorerst ueberspringen";
 "Finishing" = "Finishing";
 "Stop Local Multiplayer" = "Lokalen Multiplayer stoppen";
 "System" = "System";
@@ -148,6 +152,7 @@
 "This will end the session for all connected devices." = "Dadurch wird die Sitzung für alle verbundenen Geräte beendet.";
 "This will permanently delete all saved game history." = "Dadurch wird der gesamte gespeicherte Spielverlauf dauerhaft gelöscht.";
 "Throws" = "Würfe";
+"Track your stats and use your profile in new games." = "Verfolge deine Statistiken und nutze dein Profil in neuen Spielen.";
 "Total Legs" = "Legs gesamt";
 "Triple" = "Triple";
 "Undo" = "Rückgängig";
@@ -158,6 +163,7 @@
 "Winner" = "Gewinner";
 "Wins" = "Siege";
 "X01" = "X01";
+"Your name" = "Dein Name";
 "You already started this leg. This will discard current progress." = "Du hast dieses Leg bereits begonnen. Der aktuelle Fortschritt wird verworfen.";
 "You can only enter your own scores" = "Du kannst nur deine eigenen Scores eingeben";
 "You enter scores for your opponent" = "Du gibst Scores für deinen Gegner ein";

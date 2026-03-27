@@ -2,14 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSCameraUsageDescription</key>
-    <string>Camera is used to scan the host's QR code when joining a multiplayer game.</string>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>DartScorer uses the local network to connect with other players on the same Wi-Fi for multiplayer games.</string>
-    <key>NSBonjourServices</key>
-    <array>
-        <string>_dartscore._tcp</string>
-        <string>_dartscore._udp</string>
-    </array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartscore._tcp</string>
+		<string>_dartscore._udp</string>
+	</array>
 </dict>
 </plist>

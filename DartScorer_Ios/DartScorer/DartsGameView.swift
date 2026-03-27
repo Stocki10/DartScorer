@@ -17,6 +17,7 @@ struct DartsGameView: View {
     @AppStorage("appAccentGreen") private var appAccentGreen = AppAccentColor.defaultGreen
     @AppStorage("appAccentBlue") private var appAccentBlue = AppAccentColor.defaultBlue
     @AppStorage("scoreEntryMode") private var storedScoreEntryModeRaw = ScoreEntryMode.throwsMode.rawValue
+    @AppStorage("defaultProfileID") private var defaultProfileID = ""
     @State private var selectedMultiplier: DartMultiplier = .single
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
@@ -445,12 +446,16 @@ struct DartsGameView: View {
     private func presentNewGameSetup() {
         persistCompletedGameIfNeeded()
         let persistedNames = persistedNewGamePlayerNames()
+        let storedDefaultProfileID = UUID(uuidString: defaultProfileID)
+        let defaultProfile = storedDefaultProfileID.flatMap { id in
+            profileStore.profiles.first { $0.id == id }
+        }
         let fallbackNames = game.players.enumerated().map { index, player in
             SetupPlayer(
-                name: player.name,
+                name: defaultName(for: player, index: index, defaultProfile: defaultProfile),
                 defaultName: "Player \(index + 1)",
-                colorHex: player.colorHex,
-                profileID: player.profileID
+                colorHex: defaultColorHex(for: player, index: index, defaultProfile: defaultProfile),
+                profileID: defaultProfileID(for: player, index: index, defaultProfile: defaultProfile)
             )
         }
         if persistedNames.isEmpty {
@@ -545,5 +550,26 @@ struct DartsGameView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return Array(trimmed.prefix(5))
+    }
+
+    private func defaultName(for player: Player, index: Int, defaultProfile: PlayerProfile?) -> String {
+        if index == 0, let defaultProfile {
+            return defaultProfile.name
+        }
+        return player.name
+    }
+
+    private func defaultColorHex(for player: Player, index: Int, defaultProfile: PlayerProfile?) -> String? {
+        if index == 0, let defaultProfile {
+            return defaultProfile.colorHex
+        }
+        return player.colorHex
+    }
+
+    private func defaultProfileID(for player: Player, index: Int, defaultProfile: PlayerProfile?) -> UUID? {
+        if index == 0, let defaultProfile {
+            return defaultProfile.id
+        }
+        return player.profileID
     }
 }
