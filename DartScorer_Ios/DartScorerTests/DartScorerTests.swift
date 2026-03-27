@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import DartScorer
 
@@ -328,8 +329,6 @@ struct DartScorerTests {
     }
 
     @Test func cricketTracksMarksForAllTargetsFrom20To15AndBull() {
-        let game = DartsGame(playerCount: 2, gameMode: .cricket)
-
         let expectations: [(CricketTarget, DartSegment, DartMultiplier, Int)] = [
             (.twenty, .number(20), .triple, 3),
             (.nineteen, .number(19), .double, 2),
