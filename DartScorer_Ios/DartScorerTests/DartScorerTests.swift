@@ -26,6 +26,28 @@ struct DartScorerTests {
         #expect(game.currentTurn.darts.isEmpty)
     }
 
+    @Test func bustVisitDoesNotCarryThrowBadgesFromPreviousVisit() {
+        let game = DartsGame(playerCount: 2)
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+
+        game.submitThrow(segment: .number(0), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+
+        game.players[0].score = 66
+        game.currentTurn = Turn(startingScore: 66)
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.players[0].score == 66)
+        #expect(game.activePlayerIndex == 1)
+        #expect(game.lastTurnThrows(for: game.players[0]) == [60, 60])
+    }
+
     @Test func doubleOutIsRequired() {
         let game = DartsGame(playerCount: 2)
         game.players[0].score = 20

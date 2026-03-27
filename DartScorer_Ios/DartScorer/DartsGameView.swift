@@ -18,8 +18,6 @@ struct DartsGameView: View {
     @AppStorage("appAccentBlue") private var appAccentBlue = AppAccentColor.defaultBlue
     @AppStorage("scoreEntryMode") private var storedScoreEntryModeRaw = ScoreEntryMode.throwsMode.rawValue
     @State private var selectedMultiplier: DartMultiplier = .single
-    @State private var quickScoreText = ""
-    @State private var isShowingQuickScoreInput = false
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupGameMode: GameMode = .x01
@@ -176,13 +174,10 @@ struct DartsGameView: View {
                                 .allowsHitTesting((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .throwsMode)
 
                             QuickScorePadView(
-                                scoreText: $quickScoreText,
-                                isShowingManualInput: $isShowingQuickScoreInput,
                                 isInputLocked: isInputLocked,
                                 hasWinner: game.winner != nil,
                                 isVisitOpenInThrowsMode: isVisitOpenInThrowsMode,
                                 onQuickScoreTap: submitQuickScore,
-                                onSubmitManualScore: submitManualQuickScore,
                                 onNoScoreTap: submitNoScoreTurn
                             )
                             .opacity((ScoreEntryMode(rawValue: storedScoreEntryModeRaw) ?? .throwsMode) == .quick ? 1 : 0)
@@ -271,8 +266,6 @@ struct DartsGameView: View {
             if mode == .cricket {
                 storedScoreEntryModeRaw = ScoreEntryMode.throwsMode.rawValue
             }
-            quickScoreText = ""
-            isShowingQuickScoreInput = false
         }
         .alert("Player Disconnected", isPresented: Binding(
             get: { disconnectedPeerName != nil },
@@ -425,13 +418,6 @@ struct DartsGameView: View {
         } else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
-        quickScoreText = ""
-        isShowingQuickScoreInput = false
-    }
-
-    private func submitManualQuickScore() {
-        guard let score = Int(quickScoreText.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
-        submitQuickScore(score)
     }
 
     @ViewBuilder
