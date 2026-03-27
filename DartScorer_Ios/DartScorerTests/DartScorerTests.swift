@@ -205,6 +205,23 @@ struct DartScorerTests {
         #expect(game.players.map(\.id) == Array(orderBefore.reversed()))
     }
 
+    @Test func restartLegResetsX01ScoresAndCurrentVisit() {
+        let game = DartsGame(playerCount: 2)
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(19), multiplier: .triple)
+
+        #expect(game.players[0].score == 384)
+        #expect(game.currentTurn.darts.count == 2)
+
+        game.restartLeg()
+
+        #expect(game.players.allSatisfy { $0.score == 501 })
+        #expect(game.activePlayerIndex == 0)
+        #expect(game.currentTurn.darts.isEmpty)
+        #expect(game.lastTurnThrows(for: game.players[0]).isEmpty)
+    }
+
     @Test func legAverageUsesScoredPointsPerThreeDarts() {
         let game = DartsGame(playerCount: 2)
 
@@ -310,6 +327,26 @@ struct DartScorerTests {
         #expect(game.lastTurnThrows(for: game.players[0]) == [50])
     }
 
+    @Test func cricketTracksMarksForAllTargetsFrom20To15AndBull() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+
+        let expectations: [(CricketTarget, DartSegment, DartMultiplier, Int)] = [
+            (.twenty, .number(20), .triple, 3),
+            (.nineteen, .number(19), .double, 2),
+            (.eighteen, .number(18), .single, 1),
+            (.seventeen, .number(17), .triple, 3),
+            (.sixteen, .number(16), .double, 2),
+            (.fifteen, .number(15), .single, 1),
+            (.bull, .bull, .double, 2)
+        ]
+
+        for (target, segment, multiplier, expectedMarks) in expectations {
+            let freshGame = DartsGame(playerCount: 2, gameMode: .cricket)
+            freshGame.submitThrow(segment: segment, multiplier: multiplier)
+            #expect(freshGame.cricketMarks(for: freshGame.players[0], target: target) == expectedMarks)
+        }
+    }
+
     @Test func cricketCountsMarksAndScoresOverflow() {
         let game = DartsGame(playerCount: 2, gameMode: .cricket)
 
@@ -318,6 +355,46 @@ struct DartScorerTests {
 
         #expect(game.cricketMarks(for: game.players[0], target: .twenty) == 3)
         #expect(game.cricketScore(for: game.players[0]) == 60)
+    }
+
+    @Test func cricketDoesNotScoreWhenAllOpponentsClosedTarget() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+        let playerOne = game.players[0]
+        let playerTwo = game.players[1]
+        let snapshot = NetworkGameState(
+            players: game.players,
+            activePlayerIndex: 0,
+            currentTurn: Turn(startingScore: 0),
+            winner: nil,
+            setWinner: nil,
+            statusMessage: nil,
+            gameMode: GameMode.cricket.rawValue,
+            finishRule: FinishRule.doubleOut.rawValue,
+            inRule: InRule.default.rawValue,
+            startingScore: 0,
+            setModeEnabled: false,
+            legsToWin: 1,
+            legsWonByPlayerID: [:],
+            lastTurnThrowsByPlayerID: [:],
+            pointsScoredByPlayerID: [:],
+            dartsThrownByPlayerID: [:],
+            hasOpenedLegByPlayerID: [:],
+            highestTurnScoreByPlayerID: [:],
+            checkoutOpportunitiesByPlayerID: [:],
+            checkoutConversionsByPlayerID: [:],
+            highestCheckoutByPlayerID: [:],
+            cricketMarksByPlayerID: [
+                playerOne.id.uuidString: ["20": 3],
+                playerTwo.id.uuidString: ["20": 3]
+            ],
+            cricketScoreByPlayerID: [:]
+        )
+
+        game.applySnapshot(snapshot)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.cricketMarks(for: game.players[0], target: .twenty) == 3)
+        #expect(game.cricketScore(for: game.players[0]) == 0)
     }
 
     @Test func cricketWinnerRequiresClosedTargetsAndLead() {
@@ -332,6 +409,112 @@ struct DartScorerTests {
         }
 
         #expect(game.winner?.id == game.players[0].id)
+    }
+
+    @Test func cricketDoesNotWinWhenClosingLastTargetWhileStillBehind() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+        let playerOne = game.players[0]
+        let playerTwo = game.players[1]
+
+        let closedExceptBull: [String: Int] = [
+            "20": 3, "19": 3, "18": 3, "17": 3, "16": 3, "15": 3, "25": 2
+        ]
+
+        let snapshot = NetworkGameState(
+            players: game.players,
+            activePlayerIndex: 0,
+            currentTurn: Turn(startingScore: 0),
+            winner: nil,
+            setWinner: nil,
+            statusMessage: nil,
+            gameMode: GameMode.cricket.rawValue,
+            finishRule: FinishRule.doubleOut.rawValue,
+            inRule: InRule.default.rawValue,
+            startingScore: 0,
+            setModeEnabled: false,
+            legsToWin: 1,
+            legsWonByPlayerID: [:],
+            lastTurnThrowsByPlayerID: [:],
+            pointsScoredByPlayerID: [:],
+            dartsThrownByPlayerID: [:],
+            hasOpenedLegByPlayerID: [:],
+            highestTurnScoreByPlayerID: [:],
+            checkoutOpportunitiesByPlayerID: [:],
+            checkoutConversionsByPlayerID: [:],
+            highestCheckoutByPlayerID: [:],
+            cricketMarksByPlayerID: [
+                playerOne.id.uuidString: closedExceptBull,
+                playerTwo.id.uuidString: [:]
+            ],
+            cricketScoreByPlayerID: [
+                playerOne.id.uuidString: 0,
+                playerTwo.id.uuidString: 40
+            ]
+        )
+
+        game.applySnapshot(snapshot)
+        game.submitThrow(segment: .bull, multiplier: .single)
+
+        #expect(game.allCricketTargetsClosed(for: game.players[0]) == true)
+        #expect(game.cricketScore(for: game.players[0]) == 0)
+        #expect(game.winner == nil)
+    }
+
+    @Test func cricketWinsWhenClosingLastTargetLevelOrAhead() {
+        let game = DartsGame(playerCount: 2, gameMode: .cricket)
+        let playerOne = game.players[0]
+        let playerTwo = game.players[1]
+
+        let closedExceptBull: [String: Int] = [
+            "20": 3, "19": 3, "18": 3, "17": 3, "16": 3, "15": 3, "25": 2
+        ]
+
+        let snapshot = NetworkGameState(
+            players: game.players,
+            activePlayerIndex: 0,
+            currentTurn: Turn(startingScore: 0),
+            winner: nil,
+            setWinner: nil,
+            statusMessage: nil,
+            gameMode: GameMode.cricket.rawValue,
+            finishRule: FinishRule.doubleOut.rawValue,
+            inRule: InRule.default.rawValue,
+            startingScore: 0,
+            setModeEnabled: false,
+            legsToWin: 1,
+            legsWonByPlayerID: [:],
+            lastTurnThrowsByPlayerID: [:],
+            pointsScoredByPlayerID: [:],
+            dartsThrownByPlayerID: [:],
+            hasOpenedLegByPlayerID: [:],
+            highestTurnScoreByPlayerID: [:],
+            checkoutOpportunitiesByPlayerID: [:],
+            checkoutConversionsByPlayerID: [:],
+            highestCheckoutByPlayerID: [:],
+            cricketMarksByPlayerID: [
+                playerOne.id.uuidString: closedExceptBull,
+                playerTwo.id.uuidString: [:]
+            ],
+            cricketScoreByPlayerID: [
+                playerOne.id.uuidString: 40,
+                playerTwo.id.uuidString: 40
+            ]
+        )
+
+        game.applySnapshot(snapshot)
+        game.submitThrow(segment: .bull, multiplier: .single)
+
+        #expect(game.allCricketTargetsClosed(for: game.players[0]) == true)
+        #expect(game.winner?.id == game.players[0].id)
+    }
+
+    @Test func cricketSupportsFivePlayers() {
+        let game = DartsGame(playerCount: 5, gameMode: .cricket)
+
+        #expect(game.players.count == 5)
+        #expect(game.players.allSatisfy { player in
+            game.cricketTargets.allSatisfy { game.cricketMarks(for: player, target: $0) == 0 }
+        })
     }
 
     @Test func bestPossibleFinishCacheInvalidatesOnUndo() {
