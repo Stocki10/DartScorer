@@ -783,4 +783,160 @@ struct DartScorerTests {
         #expect(record.legs.count == 2)
         #expect(record.legs[0].winnerPlayerID == record.legs[1].winnerPlayerID)
     }
+
+    @Test func matchShareSummaryUsesX01Stats() {
+        let winnerID = UUID()
+        let loserID = UUID()
+        let record = GameRecord(
+            id: UUID(),
+            date: Date(timeIntervalSince1970: 0),
+            startingScore: 501,
+            finishRule: FinishRule.doubleOut.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: winnerID,
+                    name: "Alex",
+                    average: 72.4,
+                    firstNineAverage: 80.0,
+                    highestTurnScore: 140,
+                    highestScore: 140,
+                    checkoutPercentage: 0.5,
+                    checkoutAttempts: 2,
+                    checkoutHits: 1,
+                    isWinner: true,
+                    profileID: nil,
+                    totalDartsThrown: 21,
+                    totalPointsScored: 501,
+                    highestCheckout: 101,
+                    score180Count: 0,
+                    score140PlusCount: 1,
+                    totalFirstNinePoints: 240,
+                    totalFirstNineDarts: 9
+                ),
+                PlayerGameResult(
+                    id: loserID,
+                    name: "Chris",
+                    average: 61.8,
+                    firstNineAverage: 65.0,
+                    highestTurnScore: 100,
+                    highestScore: 100,
+                    checkoutPercentage: nil,
+                    checkoutAttempts: 0,
+                    checkoutHits: 0,
+                    isWinner: false,
+                    profileID: nil,
+                    totalDartsThrown: 24,
+                    totalPointsScored: 421,
+                    highestCheckout: 0,
+                    score180Count: 0,
+                    score140PlusCount: 0,
+                    totalFirstNinePoints: 195,
+                    totalFirstNineDarts: 9
+                )
+            ],
+            legs: []
+        )
+
+        let summary = MatchShareSummary(record: record)
+
+        #expect(summary.winnerName == "Alex")
+        #expect(summary.format == "501 • \(FinishRule.doubleOut.label)")
+        #expect(summary.playerLines.first?.stats.map(\.title) == [
+            L10n.string("Average"),
+            L10n.string("Best Checkout"),
+            L10n.string("Best Turn")
+        ])
+    }
+
+    @Test func matchShareSummaryUsesCricketStats() {
+        let playerID = UUID()
+        let record = GameRecord(
+            id: UUID(),
+            date: Date(timeIntervalSince1970: 0),
+            startingScore: 0,
+            finishRule: GameMode.cricket.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: playerID,
+                    name: "Taylor",
+                    average: 18.0,
+                    firstNineAverage: nil,
+                    highestTurnScore: 60,
+                    highestScore: 60,
+                    checkoutPercentage: nil,
+                    checkoutAttempts: 0,
+                    checkoutHits: 0,
+                    isWinner: true,
+                    profileID: nil,
+                    totalDartsThrown: 27,
+                    totalPointsScored: 85,
+                    highestCheckout: 0,
+                    score180Count: 0,
+                    score140PlusCount: 0,
+                    totalFirstNinePoints: 0,
+                    totalFirstNineDarts: 0
+                )
+            ],
+            legs: []
+        )
+
+        let summary = MatchShareSummary(record: record)
+
+        #expect(summary.format == GameMode.cricket.label)
+        #expect(summary.playerLines.first?.stats.map(\.title) == [
+            L10n.string("Score"),
+            L10n.string("Darts"),
+            L10n.string("Best Turn")
+        ])
+    }
+
+    @Test func matchShareSummaryTextIncludesLocalizedWinnerLine() {
+        let playerID = UUID()
+        let record = GameRecord(
+            id: UUID(),
+            date: Date(timeIntervalSince1970: 0),
+            startingScore: 0,
+            finishRule: GameMode.practice.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: playerID,
+                    name: "Jordan",
+                    average: 45.0,
+                    firstNineAverage: nil,
+                    highestTurnScore: 125,
+                    highestScore: 125,
+                    checkoutPercentage: nil,
+                    checkoutAttempts: 0,
+                    checkoutHits: 0,
+                    isWinner: true,
+                    profileID: nil,
+                    totalDartsThrown: 18,
+                    totalPointsScored: 270,
+                    highestCheckout: 0,
+                    score180Count: 0,
+                    score140PlusCount: 0,
+                    totalFirstNinePoints: 0,
+                    totalFirstNineDarts: 0
+                )
+            ],
+            legs: []
+        )
+
+        let summary = MatchShareSummary(record: record)
+
+        #expect(summary.textSummary.contains(L10n.format("Winner: %@", "Jordan")))
+        #expect(summary.textSummary.contains(L10n.string("Scored with Just a Darts Scorer")))
+    }
+
+    @Test func practiceGameRecordStoresPracticeModeForHistory() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice, practiceMode: .doublesPractice)
+
+        let record = game.buildGameRecord()
+
+        #expect(record.finishRule == GameMode.practice.rawValue)
+        #expect(record.practiceMode == PracticeMode.doublesPractice.rawValue)
+
+        let summary = MatchShareSummary(record: record)
+        #expect(summary.format == PracticeMode.doublesPractice.label)
+    }
 }

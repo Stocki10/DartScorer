@@ -28,7 +28,7 @@ struct ContentView: View {
             if hasCompletedOnboarding {
                 NavigationStack {
                     DartsGameView(game: game, session: session, profileStore: profileStore)
-                        .navigationTitle("DartScorer")
+                        .navigationTitle("Just a Darts Scorer")
                         .navigationBarTitleDisplayMode(.inline)
                 }
             } else {

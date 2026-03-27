@@ -8,6 +8,7 @@ struct DartsGameView: View {
     @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
     @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
     @AppStorage("newGameMode") private var storedNewGameModeRaw = GameMode.x01.rawValue
+    @AppStorage("newGamePracticeMode") private var storedNewGamePracticeModeRaw = PracticeMode.scoringDrill.rawValue
     @AppStorage("newGameFinishRule") private var storedNewGameFinishRuleRaw = FinishRule.doubleOut.rawValue
     @AppStorage("newGameInRule") private var storedNewGameInRuleRaw = InRule.default.rawValue
     @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
@@ -22,6 +23,7 @@ struct DartsGameView: View {
     @State private var isShowingNewGameSetup = false
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupGameMode: GameMode = .x01
+    @State private var setupPracticeMode: PracticeMode = .scoringDrill
     @State private var setupFinishRule: FinishRule = .doubleOut
     @State private var setupInRule: InRule = .default
     @State private var setupStartScore: StartScoreOption = .score501
@@ -35,6 +37,8 @@ struct DartsGameView: View {
     @State private var isShowingHistory = false
     @State private var isShowingProfiles = false
     @State private var hasPersistedCompletedGame = false
+    @State private var shareItems: [Any] = []
+    @State private var isShowingShareSheet = false
     @StateObject private var historyStore = GameHistoryStore()
     @ObservedObject var profileStore: PlayerProfileStore
     @State private var draftThemeMode: AppThemeMode = .light
@@ -54,7 +58,7 @@ struct DartsGameView: View {
     }
 
     private var canUseQuickScoreMode: Bool {
-        game.gameMode != .cricket
+        game.gameMode != .cricket && (game.gameMode != .practice || game.practiceMode == .scoringDrill)
     }
 
     private var isVisitOpenInThrowsMode: Bool {
@@ -62,9 +66,10 @@ struct DartsGameView: View {
     }
 
     private var winnerTitle: String {
-        game.gameMode == .x01
-            ? (game.setWinner == nil ? L10n.string("Leg Won") : L10n.string("Winner"))
-            : L10n.string("Winner")
+        if let winner = game.winner {
+            return L10n.format("%@ Wins", winner.name)
+        }
+        return L10n.string("Winner")
     }
 
     private var winningSubtitle: String {
@@ -90,6 +95,11 @@ struct DartsGameView: View {
         default:
             return statusMessage
         }
+    }
+
+    private var currentMatchShareSummary: MatchShareSummary? {
+        guard game.winner != nil else { return nil }
+        return winnerShareSummary(for: game.buildGameRecord())
     }
 
     var body: some View {
@@ -197,6 +207,7 @@ struct DartsGameView: View {
                     winnerName: winner.name,
                     title: winnerTitle,
                     subtitle: winningSubtitle,
+                    summary: currentMatchShareSummary,
                     showNewLeg: game.setWinner == nil,
                     canUndo: game.canUndo,
                     canUndoLocally: !session.isActive || session.canUndoLocally,
@@ -208,6 +219,7 @@ struct DartsGameView: View {
                     onNewGame: session.role == .joiner ? nil : {
                         presentNewGameSetup()
                     },
+                    onShareSummary: shareCurrentMatchSummary,
                     onUndo: undoLastThrow
                 )
             }
@@ -224,6 +236,7 @@ struct DartsGameView: View {
             NewGameSetupView(
                 setupPlayers: $setupPlayers,
                 gameMode: $setupGameMode,
+                practiceMode: $setupPracticeMode,
                 finishRule: $setupFinishRule,
                 inRule: $setupInRule,
                 startScore: $setupStartScore,
@@ -249,6 +262,9 @@ struct DartsGameView: View {
         }
         .sheet(isPresented: $isShowingProfiles) {
             PlayerProfileView(store: profileStore)
+        }
+        .sheet(isPresented: $isShowingShareSheet) {
+            ShareSheet(items: shareItems)
         }
         .onChange(of: session.gameHasStarted) { _, started in
             guard started && session.role == .joiner else { return }
@@ -329,6 +345,7 @@ struct DartsGameView: View {
         game.newGame(
             players: playerObjects,
             gameMode: setupGameMode,
+            practiceMode: setupPracticeMode,
             finishRule: setupFinishRule,
             inRule: setupInRule,
             startingScore: setupGameMode == .practice ? 0 : setupStartScore.rawValue,
@@ -476,6 +493,7 @@ struct DartsGameView: View {
 
         setupFinishRule = FinishRule(rawValue: storedNewGameFinishRuleRaw) ?? game.finishRule
         setupGameMode = GameMode(rawValue: storedNewGameModeRaw) ?? game.gameMode
+        setupPracticeMode = PracticeMode(rawValue: storedNewGamePracticeModeRaw) ?? game.practiceMode
         setupInRule = InRule(rawValue: storedNewGameInRuleRaw) ?? game.inRule
         setupStartScore = StartScoreOption(rawValue: storedNewGameStartScoreRaw)
             ?? (StartScoreOption(rawValue: game.startingScore) ?? .score501)
@@ -518,6 +536,22 @@ struct DartsGameView: View {
         appAccentBlue = components.blue
     }
 
+    private func shareCurrentMatchSummary() {
+        persistCompletedGameIfNeeded()
+        let record = game.buildGameRecord()
+        let summary = winnerShareSummary(for: record)
+        shareItems = MatchShareRenderer.shareItems(for: summary)
+        isShowingShareSheet = true
+    }
+
+    private func winnerShareSummary(for record: GameRecord) -> MatchShareSummary {
+        let playerColors = Dictionary(uniqueKeysWithValues: game.players.map { ($0.id, $0.colorHex) })
+        if let latestLeg = record.legs.last {
+            return MatchShareSummary(record: record, leg: latestLeg, playerColors: playerColors)
+        }
+        return MatchShareSummary(record: record, playerColors: playerColors)
+    }
+
     private func persistNewGameSettings() {
         let names = setupPlayers.map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) }
         if let data = try? JSONEncoder().encode(names), let json = String(data: data, encoding: .utf8) {
@@ -529,6 +563,7 @@ struct DartsGameView: View {
         }
         storedNewGameFinishRuleRaw = setupFinishRule.rawValue
         storedNewGameModeRaw = setupGameMode.rawValue
+        storedNewGamePracticeModeRaw = setupPracticeMode.rawValue
         storedNewGameInRuleRaw = setupInRule.rawValue
         storedNewGameStartScoreRaw = setupStartScore.rawValue
         storedNewGameSetModeEnabled = setupSetModeEnabled

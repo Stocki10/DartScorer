@@ -20,6 +20,17 @@ enum GameMode: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum PracticeMode: String, CaseIterable, Identifiable, Codable {
+    case scoringDrill = "Scoring Drill"
+    case checkoutPractice = "Checkout Practice"
+    case doublesPractice = "Doubles Practice"
+    case aroundTheClock = "Around the Clock"
+
+    var id: String { rawValue }
+
+    var label: String { L10n.string(rawValue) }
+}
+
 enum CricketTarget: Int, CaseIterable, Identifiable, Codable {
     case twenty = 20
     case nineteen = 19
@@ -104,6 +115,9 @@ final class DartsGame: ObservableObject {
     @Published private(set) var highestCheckoutByPlayerID: [UUID: Int] = [:]
     @Published private(set) var cricketMarksByPlayerID: [UUID: [CricketTarget: Int]] = [:]
     @Published private(set) var cricketScoreByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var practiceMode: PracticeMode
+    @Published private(set) var practiceTargetValueByPlayerID: [UUID: Int] = [:]
+    @Published private(set) var practiceProgressByPlayerID: [UUID: Int] = [:]
 
     private var history: [GameSnapshot] = []
     private var completedLegs: [LegRecord] = []
@@ -115,6 +129,7 @@ final class DartsGame: ObservableObject {
     init(
         playerCount: Int = 2,
         gameMode: GameMode = .x01,
+        practiceMode: PracticeMode = .scoringDrill,
         startingScore: Int = 501,
         finishRule: FinishRule = .doubleOut,
         inRule: InRule = .default,
@@ -125,6 +140,7 @@ final class DartsGame: ObservableObject {
         let clampedCount = min(max(minimumPlayers, playerCount), 5)
         let initialScore = gameMode == .x01 ? startingScore : 0
         self.gameMode = gameMode
+        self.practiceMode = practiceMode
         self.startingScore = initialScore
         self.finishRule = finishRule
         self.inRule = inRule
@@ -137,6 +153,7 @@ final class DartsGame: ObservableObject {
         resetLegStats()
         currentLegStartingPlayerID = players.first?.id
         recordCheckoutOpportunityForCurrentPlayer()
+        updatePracticeStatusMessage()
     }
 
     var activePlayer: Player {
@@ -377,6 +394,7 @@ final class DartsGame: ObservableObject {
         newGame(
             playerNames: playerNames,
             gameMode: gameMode,
+            practiceMode: practiceMode,
             finishRule: finishRule,
             inRule: inRule,
             startingScore: startingScore,
@@ -388,6 +406,7 @@ final class DartsGame: ObservableObject {
     func newGame(
         playerNames: [String],
         gameMode: GameMode,
+        practiceMode: PracticeMode,
         finishRule: FinishRule,
         inRule: InRule,
         startingScore: Int,
@@ -400,6 +419,7 @@ final class DartsGame: ObservableObject {
         lastTurnThrowsByPlayerID.removeAll()
         let preparedNames = sanitizeAndClampNames(playerNames, for: gameMode)
         self.gameMode = gameMode
+        self.practiceMode = practiceMode
         self.startingScore = gameMode == .x01 ? startingScore : 0
         self.finishRule = finishRule
         self.inRule = inRule
@@ -419,12 +439,15 @@ final class DartsGame: ObservableObject {
         )
         currentLegStartingPlayerID = players.first?.id
         recordCheckoutOpportunityForCurrentPlayer()
+        initializePracticeState()
+        updatePracticeStatusMessage()
     }
 
     func newGame(playerNames: [String], finishRule: FinishRule) {
         newGame(
             playerNames: playerNames,
             gameMode: gameMode,
+            practiceMode: practiceMode,
             finishRule: finishRule,
             inRule: inRule,
             startingScore: startingScore,
@@ -436,6 +459,7 @@ final class DartsGame: ObservableObject {
     func newGame(
         players inputPlayers: [Player],
         gameMode: GameMode,
+        practiceMode: PracticeMode,
         finishRule: FinishRule,
         inRule: InRule,
         startingScore: Int,
@@ -447,6 +471,7 @@ final class DartsGame: ObservableObject {
         currentLegStartingPlayerID = nil
         lastTurnThrowsByPlayerID.removeAll()
         self.gameMode = gameMode
+        self.practiceMode = practiceMode
         self.startingScore = gameMode == .x01 ? startingScore : 0
         self.finishRule = finishRule
         self.inRule = inRule
@@ -470,6 +495,8 @@ final class DartsGame: ObservableObject {
         )
         currentLegStartingPlayerID = players.first?.id
         recordCheckoutOpportunityForCurrentPlayer()
+        initializePracticeState()
+        updatePracticeStatusMessage()
     }
 
     func newGame(playerCount: Int) {
@@ -481,6 +508,7 @@ final class DartsGame: ObservableObject {
         newGame(
             playerNames: names,
             gameMode: gameMode,
+            practiceMode: practiceMode,
             finishRule: finishRule,
             inRule: inRule,
             startingScore: startingScore,
@@ -506,6 +534,7 @@ final class DartsGame: ObservableObject {
         statusMessage = previous.statusMessage
         inRule = previous.inRule
         gameMode = previous.gameMode
+        practiceMode = previous.practiceMode
         setModeEnabled = previous.setModeEnabled
         legsToWin = previous.legsToWin
         legsWonByPlayerID = previous.legsWonByPlayerID
@@ -520,6 +549,8 @@ final class DartsGame: ObservableObject {
         highestCheckoutByPlayerID = previous.highestCheckoutByPlayerID
         cricketMarksByPlayerID = previous.cricketMarksByPlayerID
         cricketScoreByPlayerID = previous.cricketScoreByPlayerID
+        practiceTargetValueByPlayerID = previous.practiceTargetValueByPlayerID
+        practiceProgressByPlayerID = previous.practiceProgressByPlayerID
         completedLegs = previous.completedLegs
         currentLegStartingPlayerID = previous.currentLegStartingPlayerID
         scoredDartPointsHistoryByPlayerID = previous.scoredDartPointsHistoryByPlayerID
@@ -611,6 +642,7 @@ final class DartsGame: ObservableObject {
             date: Date(),
             startingScore: startingScore,
             finishRule: gameMode == .x01 ? finishRule.rawValue : gameMode.rawValue,
+            practiceMode: gameMode == .practice ? practiceMode.rawValue : nil,
             playerResults: results,
             legs: completedLegs
         )
@@ -645,6 +677,7 @@ final class DartsGame: ObservableObject {
             openedAtTurnStart: hasOpenedLegByPlayerID[nextPlayer.id] ?? (inRule == .default)
         )
         recordCheckoutOpportunityForCurrentPlayer()
+        updatePracticeStatusMessage()
     }
 
     private func startNewLeg(randomSequence: Bool, invertedSequence: Bool) {
@@ -672,12 +705,14 @@ final class DartsGame: ObservableObject {
         activePlayerIndex = 0
         resetOpenState()
         players = players.map { p in var q = p; q.score = startingScore; return q }
+        initializePracticeState()
         currentLegStartingPlayerID = players.first?.id
         currentTurn = Turn(
             startingScore: startingScore,
             openedAtTurnStart: hasOpenedLegByPlayerID[players[activePlayerIndex].id] ?? (inRule == .default)
         )
         recordCheckoutOpportunityForCurrentPlayer()
+        updatePracticeStatusMessage()
     }
 
     private func findTopRoutes(for score: Int, dartsRemaining: Int, maxRoutes: Int) -> [String] {
@@ -794,6 +829,25 @@ final class DartsGame: ObservableObject {
         return result
     }
 
+    private static let practiceCheckoutCandidates = [41, 50, 60, 70, 81, 90, 95, 100, 101, 110, 121]
+    private static let aroundTheClockTargets = Array(1...20) + [25]
+
+    private static func randomCheckoutTarget() -> Int {
+        practiceCheckoutCandidates.randomElement() ?? 101
+    }
+
+    private static func randomDoubleTarget() -> Int {
+        ([25] + Array(1...20)).randomElement() ?? 20
+    }
+
+    private static func matchesAroundTheClockTarget(_ target: Int, segment: DartSegment) -> Bool {
+        if target == 25 { return segment == .bull }
+        if case .number(let value) = segment {
+            return value == target
+        }
+        return false
+    }
+
     private func effectivePointsForThrow(_ throwValue: DartThrow, playerID: UUID) -> Int {
         guard gameMode == .x01 else { return throwValue.points }
         if inRule == .doubleIn {
@@ -822,6 +876,7 @@ extension DartsGame {
             setWinner: setWinner,
             statusMessage: statusMessage,
             gameMode: gameMode.rawValue,
+            practiceMode: practiceMode.rawValue,
             finishRule: finishRule.rawValue,
             inRule: inRule.rawValue,
             startingScore: startingScore,
@@ -837,7 +892,9 @@ extension DartsGame {
             checkoutConversionsByPlayerID: checkoutConversionsByPlayerID.stringKeyed,
             highestCheckoutByPlayerID: highestCheckoutByPlayerID.stringKeyed,
             cricketMarksByPlayerID: cricketMarksByPlayerID.stringKeyedCricketMarks,
-            cricketScoreByPlayerID: cricketScoreByPlayerID.stringKeyed
+            cricketScoreByPlayerID: cricketScoreByPlayerID.stringKeyed,
+            practiceTargetValueByPlayerID: practiceTargetValueByPlayerID.stringKeyed,
+            practiceProgressByPlayerID: practiceProgressByPlayerID.stringKeyed
         )
     }
 
@@ -850,6 +907,7 @@ extension DartsGame {
         setWinner = state.setWinner
         statusMessage = state.statusMessage
         gameMode = GameMode(rawValue: state.gameMode) ?? .x01
+        practiceMode = PracticeMode(rawValue: state.practiceMode) ?? .scoringDrill
         finishRule = FinishRule(rawValue: state.finishRule) ?? .doubleOut
         inRule = InRule(rawValue: state.inRule) ?? .default
         startingScore = state.startingScore
@@ -866,6 +924,8 @@ extension DartsGame {
         highestCheckoutByPlayerID = state.highestCheckoutByPlayerID.uuidKeyed()
         cricketMarksByPlayerID = state.cricketMarksByPlayerID.uuidKeyedCricketMarks()
         cricketScoreByPlayerID = state.cricketScoreByPlayerID.uuidKeyed()
+        practiceTargetValueByPlayerID = state.practiceTargetValueByPlayerID.uuidKeyed()
+        practiceProgressByPlayerID = state.practiceProgressByPlayerID.uuidKeyed()
         completedLegs = []
         currentLegStartingPlayerID = players.first?.id
         scoredDartPointsHistoryByPlayerID = [:]
@@ -881,6 +941,7 @@ private struct GameSnapshot {
     let winner: Player?
     let statusMessage: String?
     let gameMode: GameMode
+    let practiceMode: PracticeMode
     let inRule: InRule
     let setModeEnabled: Bool
     let legsToWin: Int
@@ -896,6 +957,8 @@ private struct GameSnapshot {
     let highestCheckoutByPlayerID: [UUID: Int]
     let cricketMarksByPlayerID: [UUID: [CricketTarget: Int]]
     let cricketScoreByPlayerID: [UUID: Int]
+    let practiceTargetValueByPlayerID: [UUID: Int]
+    let practiceProgressByPlayerID: [UUID: Int]
     let completedLegs: [LegRecord]
     let currentLegStartingPlayerID: UUID?
     let scoredDartPointsHistoryByPlayerID: [UUID: [Int]]
@@ -928,6 +991,7 @@ private extension DartsGame {
                 winner: winner,
                 statusMessage: statusMessage,
                 gameMode: gameMode,
+                practiceMode: practiceMode,
                 inRule: inRule,
                 setModeEnabled: setModeEnabled,
                 legsToWin: legsToWin,
@@ -943,6 +1007,8 @@ private extension DartsGame {
                 highestCheckoutByPlayerID: highestCheckoutByPlayerID,
                 cricketMarksByPlayerID: cricketMarksByPlayerID,
                 cricketScoreByPlayerID: cricketScoreByPlayerID,
+                practiceTargetValueByPlayerID: practiceTargetValueByPlayerID,
+                practiceProgressByPlayerID: practiceProgressByPlayerID,
                 completedLegs: completedLegs,
                 currentLegStartingPlayerID: currentLegStartingPlayerID,
                 scoredDartPointsHistoryByPlayerID: scoredDartPointsHistoryByPlayerID,
@@ -1121,7 +1187,69 @@ private extension DartsGame {
         )
     }
 
+    func initializePracticeState() {
+        practiceTargetValueByPlayerID = [:]
+        practiceProgressByPlayerID = [:]
+        guard gameMode == .practice else { return }
+        for player in players {
+            switch practiceMode {
+            case .scoringDrill:
+                practiceTargetValueByPlayerID[player.id] = 0
+                practiceProgressByPlayerID[player.id] = 0
+            case .checkoutPractice:
+                practiceTargetValueByPlayerID[player.id] = Self.randomCheckoutTarget()
+                practiceProgressByPlayerID[player.id] = 0
+            case .doublesPractice:
+                practiceTargetValueByPlayerID[player.id] = Self.randomDoubleTarget()
+                practiceProgressByPlayerID[player.id] = 0
+            case .aroundTheClock:
+                practiceTargetValueByPlayerID[player.id] = Self.aroundTheClockTargets.first ?? 1
+                practiceProgressByPlayerID[player.id] = 0
+            }
+        }
+    }
+
+    func updatePracticeStatusMessage() {
+        guard gameMode == .practice, winner == nil, players.indices.contains(activePlayerIndex) else { return }
+        let player = players[activePlayerIndex]
+        switch practiceMode {
+        case .scoringDrill:
+            statusMessage = L10n.string("Scoring Drill")
+        case .checkoutPractice:
+            let target = practiceTargetValueByPlayerID[player.id] ?? Self.randomCheckoutTarget()
+            statusMessage = L10n.format("Checkout: %@", "\(target)")
+        case .doublesPractice:
+            let target = practiceTargetValueByPlayerID[player.id] ?? Self.randomDoubleTarget()
+            statusMessage = target == 25 ? L10n.string("Hit Bull") : L10n.format("Hit D%@", "\(target)")
+        case .aroundTheClock:
+            let progress = practiceProgressByPlayerID[player.id] ?? 0
+            let target = Self.aroundTheClockTargets[min(progress, Self.aroundTheClockTargets.count - 1)]
+            statusMessage = target == 25 ? L10n.string("Hit Bull") : L10n.format("Hit %@", "\(target)")
+        }
+    }
+
     func submitPracticeThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        switch practiceMode {
+        case .scoringDrill:
+            submitScoringDrillThrow(segment: segment, multiplier: multiplier)
+        case .checkoutPractice:
+            submitCheckoutPracticeThrow(segment: segment, multiplier: multiplier)
+        case .doublesPractice:
+            submitDoublesPracticeThrow(segment: segment, multiplier: multiplier)
+        case .aroundTheClock:
+            submitAroundTheClockThrow(segment: segment, multiplier: multiplier)
+        }
+    }
+
+    func submitPracticeQuickScore(_ score: Int) {
+        guard practiceMode == .scoringDrill else {
+            statusMessage = L10n.string("Quick score is only available in Scoring Drill.")
+            return
+        }
+        submitScoringDrillQuickScore(score)
+    }
+
+    private func submitScoringDrillThrow(segment: DartSegment, multiplier: DartMultiplier) {
         guard winner == nil else { return }
         guard remainingDarts > 0 else { return }
 
@@ -1131,7 +1259,7 @@ private extension DartsGame {
         }
 
         recordSnapshot()
-        statusMessage = L10n.string("Practice mode")
+        statusMessage = L10n.string("Scoring Drill")
 
         let player = activePlayer
         appendThrowToHistory(playerID: player.id, points: throwValue.points)
@@ -1152,7 +1280,7 @@ private extension DartsGame {
         }
     }
 
-    func submitPracticeQuickScore(_ score: Int) {
+    private func submitScoringDrillQuickScore(_ score: Int) {
         guard winner == nil else { return }
         guard currentTurn.dartsUsed == 0 else {
             statusMessage = L10n.string("Finish the current visit in Throws mode.")
@@ -1164,7 +1292,7 @@ private extension DartsGame {
         }
 
         recordSnapshot()
-        statusMessage = L10n.string("Practice mode")
+        statusMessage = L10n.string("Scoring Drill")
 
         let player = activePlayer
         lastTurnThrowsByPlayerID[player.id] = [score]
@@ -1179,6 +1307,139 @@ private extension DartsGame {
         updateHighestTurnScore(for: player.id, score: score)
         recordVisit(for: player.id, score: score, isBust: false)
         endTurn()
+    }
+
+    private func submitCheckoutPracticeThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        guard winner == nil, remainingDarts > 0 else { return }
+        guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
+            statusMessage = L10n.string("Invalid throw.")
+            return
+        }
+
+        recordSnapshot()
+        let player = activePlayer
+        let currentTarget = practiceTargetValueByPlayerID[player.id] ?? Self.randomCheckoutTarget()
+        let newRemaining = currentTarget - throwValue.points
+
+        appendThrowToHistory(playerID: player.id, points: throwValue.points)
+        recordDartThrown(for: player.id)
+        appendScoredDartPoints(max(throwValue.points, 0), for: player.id)
+        addScoredPoints(throwValue.points, for: player.id)
+        currentTurn.darts.append(throwValue)
+
+        if newRemaining == 0 {
+            var updatedPlayers = players
+            updatedPlayers[activePlayerIndex].score += 1
+            players = updatedPlayers
+            let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+            updateHighestTurnScore(for: player.id, score: turnScore)
+            recordVisit(for: player.id, score: turnScore, isBust: false)
+            practiceTargetValueByPlayerID[player.id] = Self.randomCheckoutTarget()
+            endTurn()
+            updatePracticeStatusMessage()
+            return
+        }
+
+        if newRemaining < 0 || currentTurn.dartsUsed == 3 {
+            let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+            updateHighestTurnScore(for: player.id, score: turnScore)
+            recordVisit(for: player.id, score: turnScore, isBust: newRemaining < 0)
+            practiceTargetValueByPlayerID[player.id] = Self.randomCheckoutTarget()
+            endTurn()
+            updatePracticeStatusMessage()
+            return
+        }
+
+        statusMessage = L10n.format("Checkout: %@", "\(newRemaining)")
+    }
+
+    private func submitDoublesPracticeThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        guard winner == nil, remainingDarts > 0 else { return }
+        guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
+            statusMessage = L10n.string("Invalid throw.")
+            return
+        }
+
+        recordSnapshot()
+        let player = activePlayer
+        let target = practiceTargetValueByPlayerID[player.id] ?? Self.randomDoubleTarget()
+        let hitTarget = (target == 25 && segment == .bull && multiplier == .double)
+            || (target != 25 && segment == .number(target) && multiplier == .double)
+
+        appendThrowToHistory(playerID: player.id, points: throwValue.points)
+        recordDartThrown(for: player.id)
+        appendScoredDartPoints(throwValue.points, for: player.id)
+        addScoredPoints(throwValue.points, for: player.id)
+        currentTurn.darts.append(throwValue)
+
+        if hitTarget {
+            var updatedPlayers = players
+            updatedPlayers[activePlayerIndex].score += 1
+            players = updatedPlayers
+        }
+
+        if hitTarget || currentTurn.dartsUsed == 3 {
+            let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+            updateHighestTurnScore(for: player.id, score: turnScore)
+            recordVisit(for: player.id, score: turnScore, isBust: false)
+            practiceTargetValueByPlayerID[player.id] = Self.randomDoubleTarget()
+            endTurn()
+            updatePracticeStatusMessage()
+            return
+        }
+
+        statusMessage = target == 25 ? L10n.string("Hit Bull") : L10n.format("Hit D%@", "\(target)")
+    }
+
+    private func submitAroundTheClockThrow(segment: DartSegment, multiplier: DartMultiplier) {
+        guard winner == nil, remainingDarts > 0 else { return }
+        guard let throwValue = DartThrow(segment: segment, multiplier: multiplier) else {
+            statusMessage = L10n.string("Invalid throw.")
+            return
+        }
+
+        recordSnapshot()
+        let player = activePlayer
+        let progress = practiceProgressByPlayerID[player.id] ?? 0
+        let target = Self.aroundTheClockTargets[min(progress, Self.aroundTheClockTargets.count - 1)]
+        let hitTarget = Self.matchesAroundTheClockTarget(target, segment: segment)
+
+        appendThrowToHistory(playerID: player.id, points: throwValue.points)
+        recordDartThrown(for: player.id)
+        appendScoredDartPoints(throwValue.points, for: player.id)
+        addScoredPoints(throwValue.points, for: player.id)
+        currentTurn.darts.append(throwValue)
+
+        if hitTarget {
+            let newProgress = progress + 1
+            practiceProgressByPlayerID[player.id] = newProgress
+            practiceTargetValueByPlayerID[player.id] = Self.aroundTheClockTargets[min(newProgress, Self.aroundTheClockTargets.count - 1)]
+            var updatedPlayers = players
+            updatedPlayers[activePlayerIndex].score = newProgress
+            players = updatedPlayers
+            if newProgress >= Self.aroundTheClockTargets.count {
+                let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+                updateHighestTurnScore(for: player.id, score: turnScore)
+                recordVisit(for: player.id, score: turnScore, isBust: false)
+                winner = player
+                setWinner = player
+                statusMessage = L10n.format("%@ wins Around the Clock.", player.name)
+                return
+            }
+        }
+
+        if currentTurn.dartsUsed == 3 {
+            let turnScore = currentTurn.darts.reduce(0) { $0 + $1.points }
+            updateHighestTurnScore(for: player.id, score: turnScore)
+            recordVisit(for: player.id, score: turnScore, isBust: false)
+            endTurn()
+            updatePracticeStatusMessage()
+            return
+        }
+
+        let nextProgress = practiceProgressByPlayerID[player.id] ?? progress
+        let nextTarget = Self.aroundTheClockTargets[min(nextProgress, Self.aroundTheClockTargets.count - 1)]
+        statusMessage = nextTarget == 25 ? L10n.string("Hit Bull") : L10n.format("Hit %@", "\(nextTarget)")
     }
 
     func submitCricketThrow(segment: DartSegment, multiplier: DartMultiplier) {

@@ -209,11 +209,12 @@ struct GameRecord: Codable, Identifiable {
     let date: Date
     let startingScore: Int
     let finishRule: String
+    let practiceMode: String?
     let playerResults: [PlayerGameResult]
     let legs: [LegRecord]
 
     enum CodingKeys: String, CodingKey {
-        case id, date, startingScore, finishRule, playerResults, legs
+        case id, date, startingScore, finishRule, practiceMode, playerResults, legs
     }
 
     init(
@@ -221,6 +222,7 @@ struct GameRecord: Codable, Identifiable {
         date: Date,
         startingScore: Int,
         finishRule: String,
+        practiceMode: String? = nil,
         playerResults: [PlayerGameResult],
         legs: [LegRecord]
     ) {
@@ -228,6 +230,7 @@ struct GameRecord: Codable, Identifiable {
         self.date = date
         self.startingScore = startingScore
         self.finishRule = finishRule
+        self.practiceMode = practiceMode
         self.playerResults = playerResults
         self.legs = legs
     }
@@ -238,6 +241,7 @@ struct GameRecord: Codable, Identifiable {
         date = try c.decode(Date.self, forKey: .date)
         startingScore = try c.decode(Int.self, forKey: .startingScore)
         finishRule = try c.decode(String.self, forKey: .finishRule)
+        practiceMode = try? c.decode(String.self, forKey: .practiceMode)
         playerResults = try c.decode([PlayerGameResult].self, forKey: .playerResults)
         legs = (try? c.decode([LegRecord].self, forKey: .legs)) ?? []
     }

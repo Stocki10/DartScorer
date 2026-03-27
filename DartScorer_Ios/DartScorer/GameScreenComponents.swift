@@ -233,7 +233,7 @@ struct ScoreboardSection: View {
                                     .background(Color(.tertiarySystemBackground))
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
                             }
-                            if throwsForBadge.count > 1 {
+                            if throwsForBadge.count > 1 && index != activePlayerIndex {
                                 Rectangle()
                                     .fill(Color.secondary.opacity(0.35))
                                     .frame(width: 1, height: 16)
