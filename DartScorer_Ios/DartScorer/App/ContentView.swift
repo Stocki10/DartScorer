@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var game = DartsGame(playerCount: 2)
     @StateObject private var profileStore = PlayerProfileStore()
+    @StateObject private var tournamentStore = TournamentStore()
     @StateObject private var session = MultipeerSessionManager()
     @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
     @AppStorage("appAccentRed") private var appAccentRed = AppAccentColor.defaultRed
@@ -27,7 +28,7 @@ struct ContentView: View {
         Group {
             if hasCompletedOnboarding {
                 NavigationStack {
-                    DartsGameView(game: game, session: session, profileStore: profileStore)
+                    DartsGameView(game: game, session: session, tournamentStore: tournamentStore, profileStore: profileStore)
                         .navigationTitle("Just a Darts Scorer")
                         .navigationBarTitleDisplayMode(.inline)
                 }

@@ -126,15 +126,18 @@ struct HistoryFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftFilter: GameRecordFilter
     let availablePlayers: [HistoryFilterPlayerOption]
+    let showsPlayerSection: Bool
     let onApply: (GameRecordFilter) -> Void
 
     init(
         initialFilter: GameRecordFilter,
         availablePlayers: [HistoryFilterPlayerOption],
+        showsPlayerSection: Bool = true,
         onApply: @escaping (GameRecordFilter) -> Void
     ) {
         _draftFilter = State(initialValue: initialFilter)
         self.availablePlayers = availablePlayers
+        self.showsPlayerSection = showsPlayerSection
         self.onApply = onApply
     }
 
@@ -182,20 +185,22 @@ struct HistoryFilterSheet: View {
                     }
                 }
 
-                Section(L10n.string("Player")) {
-                    filterChoiceRow(
-                        title: L10n.string("All Players"),
-                        isSelected: draftFilter.participantProfileID == nil
-                    ) {
-                        draftFilter.participantProfileID = nil
-                    }
-
-                    ForEach(availablePlayers) { player in
+                if showsPlayerSection {
+                    Section(L10n.string("Player")) {
                         filterChoiceRow(
-                            title: player.name,
-                            isSelected: draftFilter.participantProfileID == player.id
+                            title: L10n.string("All Players"),
+                            isSelected: draftFilter.participantProfileID == nil
                         ) {
-                            draftFilter.participantProfileID = player.id
+                            draftFilter.participantProfileID = nil
+                        }
+
+                        ForEach(availablePlayers) { player in
+                            filterChoiceRow(
+                                title: player.name,
+                                isSelected: draftFilter.participantProfileID == player.id
+                            ) {
+                                draftFilter.participantProfileID = player.id
+                            }
                         }
                     }
                 }
@@ -203,7 +208,9 @@ struct HistoryFilterSheet: View {
                 Section {
                     Button(L10n.string("Reset")) {
                         draftFilter.date = .allTime
-                        draftFilter.participantProfileID = nil
+                        if showsPlayerSection {
+                            draftFilter.participantProfileID = nil
+                        }
                         draftFilter.customStartDate = Calendar.current.date(byAdding: .day, value: -29, to: Date()) ?? Date()
                         draftFilter.customEndDate = Date()
                     }

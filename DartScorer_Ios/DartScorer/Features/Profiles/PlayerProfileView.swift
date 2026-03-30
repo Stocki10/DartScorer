@@ -87,6 +87,7 @@ struct ProfileDetailView: View {
     @ObservedObject var historyStore: GameHistoryStore
     let profileID: UUID
     @State private var recordFilter = GameRecordFilter()
+    @State private var isShowingFilters = false
     @State private var editingProfile: PlayerProfile?
 
     private let statsColumns = [
@@ -134,6 +135,10 @@ struct ProfileDetailView: View {
             : L10n.string("No games match the current filters.")
     }
 
+    private var showsProfileActiveFilterIndicator: Bool {
+        recordFilter.date != .allTime
+    }
+
     private var hasFilteredScoringStats: Bool {
         guard let filteredStatsSnapshot else { return false }
         return filteredStatsSnapshot.firstNineAverage != nil
@@ -168,8 +173,12 @@ struct ProfileDetailView: View {
                 }
 
                 Section("Stats") {
-                    GameRecordFilterControls(filter: $recordFilter)
-                        .padding(.vertical, 4)
+                    HistoryPrimaryFilterBar(
+                        filter: $recordFilter,
+                        showsActiveIndicator: showsProfileActiveFilterIndicator,
+                        onOpenFilters: { isShowingFilters = true }
+                    )
+                    .padding(.vertical, 4)
 
                     if filteredStatsSnapshot.hasRecords {
                         statGroup(title: L10n.string("Overview")) {
@@ -298,6 +307,15 @@ struct ProfileDetailView: View {
         }
         .sheet(item: $editingProfile) { profile in
             ProfileFormView(store: store, profile: profile)
+        }
+        .sheet(isPresented: $isShowingFilters) {
+            HistoryFilterSheet(
+                initialFilter: recordFilter,
+                availablePlayers: [],
+                showsPlayerSection: false
+            ) { appliedFilter in
+                recordFilter = appliedFilter
+            }
         }
     }
 

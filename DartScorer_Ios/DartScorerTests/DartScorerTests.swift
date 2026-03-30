@@ -159,6 +159,87 @@ struct DartScorerTests {
         )
     }
 
+    private func tournamentParticipant(seed: Int, name: String) -> TournamentParticipant {
+        TournamentParticipant(
+            profileID: UUID(),
+            name: name,
+            colorHex: "#\(seed)\(seed)\(seed)\(seed)\(seed)\(seed)",
+            seed: seed
+        )
+    }
+
+    private func tournamentRecord(
+        playerA: TournamentParticipant,
+        playerB: TournamentParticipant,
+        winner: TournamentParticipant,
+        playerALegsWon: Int,
+        playerBLegsWon: Int,
+        date: Date = .init(timeIntervalSince1970: 1)
+    ) -> GameRecord {
+        let playerAIsWinner = winner.id == playerA.id
+        let legs: [LegRecord] = (0..<(playerALegsWon + playerBLegsWon)).map { index in
+            let winnerPlayerID = index < playerALegsWon ? playerA.profileID : playerB.profileID
+            return LegRecord(
+                legNumber: index + 1,
+                startingPlayerID: index.isMultiple(of: 2) ? playerA.profileID : playerB.profileID,
+                winnerPlayerID: winnerPlayerID,
+                checkoutScore: nil,
+                winningCheckoutRoute: nil,
+                playerVisits: [],
+                playerResults: []
+            )
+        }
+        return GameRecord(
+            id: UUID(),
+            date: date,
+            startingScore: 501,
+            finishRule: FinishRule.doubleOut.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: playerA.profileID,
+                    name: playerA.name,
+                    average: 60,
+                    firstNineAverage: 75,
+                    highestTurnScore: 140,
+                    highestScore: 140,
+                    checkoutPercentage: nil,
+                    checkoutAttempts: 0,
+                    checkoutHits: 0,
+                    isWinner: playerAIsWinner,
+                    profileID: playerA.profileID,
+                    totalDartsThrown: 15,
+                    totalPointsScored: 300,
+                    highestCheckout: 100,
+                    score180Count: 0,
+                    score140PlusCount: 0,
+                    totalFirstNinePoints: 90,
+                    totalFirstNineDarts: 9
+                ),
+                PlayerGameResult(
+                    id: playerB.profileID,
+                    name: playerB.name,
+                    average: 55,
+                    firstNineAverage: 70,
+                    highestTurnScore: 121,
+                    highestScore: 121,
+                    checkoutPercentage: nil,
+                    checkoutAttempts: 0,
+                    checkoutHits: 0,
+                    isWinner: !playerAIsWinner,
+                    profileID: playerB.profileID,
+                    totalDartsThrown: 15,
+                    totalPointsScored: 275,
+                    highestCheckout: 80,
+                    score180Count: 0,
+                    score140PlusCount: 0,
+                    totalFirstNinePoints: 84,
+                    totalFirstNineDarts: 9
+                )
+            ],
+            legs: legs
+        )
+    }
+
     @Test func scoreSubtractionOnValidThrow() {
         let game = DartsGame(playerCount: 2)
 
@@ -1830,5 +1911,175 @@ struct DartScorerTests {
 
         #expect(snapshot.opponents.isEmpty)
         #expect(snapshot.hasCompetitiveHistory == false)
+    }
+
+    @Test func singleEliminationGeneratesBracketAndCompletesTournament() {
+        let store = TournamentStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Alex"),
+            tournamentParticipant(seed: 2, name: "Blake"),
+            tournamentParticipant(seed: 3, name: "Casey"),
+            tournamentParticipant(seed: 4, name: "Drew")
+        ]
+
+        let tournament = store.createTournament(
+            name: "Spring Cup",
+            format: .singleElimination,
+            participants: participants,
+            rules: TournamentMatchRules()
+        )
+
+        #expect(tournament.rounds.count == 2)
+        #expect(tournament.matches.count == 3)
+
+        let semifinalMatches = tournament.matches.filter { $0.roundIndex == 0 }.sorted { $0.slotIndex < $1.slotIndex }
+        let semifinalOne = semifinalMatches[0]
+        let semifinalTwo = semifinalMatches[1]
+
+        store.completeMatch(
+            tournamentID: tournament.id,
+            matchID: semifinalOne.id,
+            record: tournamentRecord(
+                playerA: participants[0],
+                playerB: participants[3],
+                winner: participants[0],
+                playerALegsWon: 2,
+                playerBLegsWon: 0
+            )
+        )
+        store.completeMatch(
+            tournamentID: tournament.id,
+            matchID: semifinalTwo.id,
+            record: tournamentRecord(
+                playerA: participants[1],
+                playerB: participants[2],
+                winner: participants[2],
+                playerALegsWon: 0,
+                playerBLegsWon: 2,
+                date: .init(timeIntervalSince1970: 2)
+            )
+        )
+
+        let updated = try #require(store.tournament(id: tournament.id))
+        let finalMatch = try #require(updated.matches.first(where: { $0.roundIndex == 1 }))
+        #expect(finalMatch.status == .ready)
+
+        store.completeMatch(
+            tournamentID: tournament.id,
+            matchID: finalMatch.id,
+            record: tournamentRecord(
+                playerA: participants[0],
+                playerB: participants[2],
+                winner: participants[2],
+                playerALegsWon: 1,
+                playerBLegsWon: 2,
+                date: .init(timeIntervalSince1970: 3)
+            )
+        )
+
+        let completed = try #require(store.tournament(id: tournament.id))
+        #expect(completed.status == .completed)
+        #expect(completed.winnerParticipantID == participants[2].id)
+    }
+
+    @Test func singleEliminationRespectsSelectedPlayerOrderForSeeding() {
+        let store = TournamentStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Blake"),
+            tournamentParticipant(seed: 2, name: "Alex"),
+            tournamentParticipant(seed: 3, name: "Casey"),
+            tournamentParticipant(seed: 4, name: "Drew")
+        ]
+
+        let tournament = store.createTournament(
+            name: "Seeded Cup",
+            format: .singleElimination,
+            participants: participants,
+            rules: TournamentMatchRules()
+        )
+
+        let firstRoundMatches = tournament.matches
+            .filter { $0.roundIndex == 0 }
+            .sorted { $0.slotIndex < $1.slotIndex }
+
+        let firstMatch = try #require(firstRoundMatches.first)
+        let secondMatch = try #require(firstRoundMatches.last)
+
+        #expect(firstMatch.playerAParticipantID == participants[0].id)
+        #expect(firstMatch.playerBParticipantID == participants[3].id)
+        #expect(secondMatch.playerAParticipantID == participants[1].id)
+        #expect(secondMatch.playerBParticipantID == participants[2].id)
+    }
+
+    @Test func singleEliminationAutoAdvancesBye() {
+        let store = TournamentStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Alex"),
+            tournamentParticipant(seed: 2, name: "Blake"),
+            tournamentParticipant(seed: 3, name: "Casey")
+        ]
+
+        let tournament = store.createTournament(
+            name: "Mini Cup",
+            format: .singleElimination,
+            participants: participants,
+            rules: TournamentMatchRules()
+        )
+
+        let byeMatches = tournament.matches.filter { $0.status == .bye }
+        #expect(byeMatches.count == 1)
+        #expect(byeMatches.first?.winnerParticipantID != nil)
+    }
+
+    @Test func roundRobinGeneratesUniquePairingsAndUpdatesStandings() {
+        let store = TournamentStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Alex"),
+            tournamentParticipant(seed: 2, name: "Blake"),
+            tournamentParticipant(seed: 3, name: "Casey")
+        ]
+
+        let tournament = store.createTournament(
+            name: "League Night",
+            format: .roundRobin,
+            participants: participants,
+            rules: TournamentMatchRules()
+        )
+
+        #expect(tournament.matches.count == 3)
+
+        let pairings = Set(tournament.matches.compactMap { match -> Set<UUID>? in
+            guard let playerA = match.playerAParticipantID, let playerB = match.playerBParticipantID else { return nil }
+            return Set([playerA, playerB])
+        })
+        #expect(pairings.count == 3)
+
+        for match in tournament.matches {
+            guard let playerAID = match.playerAParticipantID,
+                  let playerBID = match.playerBParticipantID,
+                  let playerA = participants.first(where: { $0.id == playerAID }),
+                  let playerB = participants.first(where: { $0.id == playerBID }) else {
+                Issue.record("Round robin match missing participants")
+                continue
+            }
+            store.completeMatch(
+                tournamentID: tournament.id,
+                matchID: match.id,
+                record: tournamentRecord(
+                    playerA: playerA,
+                    playerB: playerB,
+                    winner: playerA.name == "Alex" ? playerA : playerB,
+                    playerALegsWon: playerA.name == "Alex" ? 2 : 0,
+                    playerBLegsWon: playerA.name == "Alex" ? 0 : 2,
+                    date: .init(timeIntervalSince1970: Double(match.slotIndex + 1))
+                )
+            )
+        }
+
+        let updated = try #require(store.tournament(id: tournament.id))
+        let standings = store.standings(for: updated)
+        #expect(updated.status == .completed)
+        #expect(standings.first?.participant.name == "Alex")
+        #expect(standings.first?.wins == 2)
     }
 }

@@ -5,8 +5,8 @@ struct SettingsPopupView: View {
     @Binding var accentColor: Color
 
     let onSave: () -> Void
+    let onClose: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var isVisible = false
 
@@ -15,7 +15,7 @@ struct SettingsPopupView: View {
             Color.black.opacity(backdropOpacity)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    dismiss()
+                    onClose()
                 }
 
             VStack(spacing: 0) {
@@ -27,7 +27,7 @@ struct SettingsPopupView: View {
                     Spacer()
 
                     Button {
-                        dismiss()
+                        onClose()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.headline.weight(.semibold))
@@ -73,14 +73,14 @@ struct SettingsPopupView: View {
 
                 HStack(spacing: 12) {
                     Button("Cancel") {
-                        dismiss()
+                        onClose()
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
 
                     Button("Save") {
                         onSave()
-                        dismiss()
+                        onClose()
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
@@ -137,7 +137,8 @@ private struct SettingsPopupPreviewHost: View {
         SettingsPopupView(
             themeMode: $themeMode,
             accentColor: $accentColor,
-            onSave: {}
+            onSave: {},
+            onClose: {}
         )
         .preferredColorScheme(preferredScheme)
     }

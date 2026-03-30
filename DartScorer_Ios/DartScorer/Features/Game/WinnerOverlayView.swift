@@ -11,6 +11,10 @@ struct WinnerOverlayView: View {
     let canUndoLocally: Bool
     let onNewLegRandom: (() -> Void)?
     let onNewGame: (() -> Void)?
+    let primaryActionTitle: String?
+    let onPrimaryAction: (() -> Void)?
+    let secondaryActionTitle: String?
+    let onSecondaryAction: (() -> Void)?
     let onShareSummary: (() -> Void)?
     let onUndo: () -> Void
 
@@ -34,6 +38,17 @@ struct WinnerOverlayView: View {
                         WinnerSummaryCard(summary: summary)
                     }
 
+                    if let primaryActionTitle, let onPrimaryAction {
+                        Button(primaryActionTitle, action: onPrimaryAction)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                    }
+
+                    if let secondaryActionTitle, let onSecondaryAction {
+                        Button(secondaryActionTitle, action: onSecondaryAction)
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                    }
                 }
                 .padding()
                 .padding(.top, 88)
