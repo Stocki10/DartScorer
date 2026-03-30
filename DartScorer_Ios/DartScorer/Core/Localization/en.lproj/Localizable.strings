@@ -2,6 +2,7 @@
 "Accent Color" = "Accent Color";
 "Add a profile to track your stats across games." = "Add a profile to track your stats across games.";
 "Any Player" = "Any Player";
+"All players need to be assigned." = "All players need to be assigned.";
 "Any player can enter any score" = "Any player can enter any score";
 "Average" = "Average";
 "Avg %@  ·  %@ games" = "Avg %@  ·  %@ games";
@@ -30,6 +31,7 @@
 "Completed games will appear here." = "Completed games will appear here.";
 "Connected Devices (%@/4)" = "Connected Devices (%@/4)";
 "Connected to %@" = "Connected to %@";
+"Connected Players" = "Connected Players";
 "Connecting…" = "Connecting…";
 "ContentUnavailableView" = "ContentUnavailableView";
 "Cricket" = "Cricket";
@@ -64,14 +66,18 @@
 "History" = "History";
 "Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open." = "Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open.";
 "Host Only" = "Host Only";
+"Host" = "Host";
 "Host a Game" = "Host a Game";
+"Host is starting a new game…" = "Host is starting a new game…";
 "Hosting" = "Hosting";
 "Hosting: %@" = "Hosting: %@";
 "In Mode" = "In Mode";
 "In use" = "In use";
 "Invalid throw." = "Invalid throw.";
 "Input Mode" = "Input Mode";
+"Multiplayer Settings" = "Multiplayer Settings";
 "Join Game" = "Join Game";
+"Join" = "Join";
 "Join a Game" = "Join a Game";
 "Joined — Waiting for host to start" = "Joined — Waiting for host to start";
 "Joined Game" = "Joined Game";
@@ -90,6 +96,7 @@
 "Match complete." = "Match complete.";
 "Multiplier" = "Multiplier";
 "Mode" = "Mode";
+"Multiplayer" = "Multiplayer";
 "New Game" = "New Game";
 "New Leg (Random)" = "New Leg (Random)";
 "New Profile" = "New Profile";
@@ -101,11 +108,13 @@
 "No finish available" = "No finish available";
 "No throw" = "No throw";
 "180 Count" = "180 Count";
+"Off" = "Off";
 "OK" = "OK";
 "Opens the Buy Me a Coffee page in your browser" = "Opens the Buy Me a Coffee page in your browser";
 "Others Only (Referee)" = "Others Only (Referee)";
 "Own Only" = "Own Only";
 "Per-Player Breakdown" = "Per-Player Breakdown";
+"Scan QR" = "Scan QR";
 "Player %@" = "Player %@";
 "Player 1" = "Player 1";
 "Player 2" = "Player 2";
@@ -115,6 +124,7 @@
 "Player Summary" = "Player Summary";
 "Players: %@" = "Players: %@";
 "Played %@, %@." = "Played %@, %@.";
+"Please wait…" = "Please wait…";
 "Point the camera at the host's QR code" = "Point the camera at the host's QR code";
 "Practice" = "Practice";
 "Practice mode" = "Practice mode";
@@ -178,8 +188,10 @@
 "You already started this leg. This will discard current progress." = "You already started this leg. This will discard current progress.";
 "You can only enter your own scores" = "You can only enter your own scores";
 "You enter scores for your opponent" = "You enter scores for your opponent";
+"You can assign multiple players to one device." = "You can assign multiple players to one device.";
 "You will be disconnected from the host's game." = "You will be disconnected from the host's game.";
 "%@ device(s) connected" = "%@ device(s) connected";
+"%@ Players Connected" = "%@ Players Connected";
 "%@ games" = "%@ games";
 "%@ has left the session." = "%@ has left the session.";
 "%@ left — multiplayer session ended." = "%@ left — multiplayer session ended.";

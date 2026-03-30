@@ -1,5 +1,21 @@
 import SwiftUI
 
+private enum MultiplayerSetupMode: String, CaseIterable, Identifiable {
+    case off
+    case host
+    case join
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .off: return L10n.string("Off")
+        case .host: return L10n.string("Host")
+        case .join: return L10n.string("Join")
+        }
+    }
+}
+
 struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
     @Binding var gameMode: GameMode
@@ -21,8 +37,10 @@ struct NewGameSetupView: View {
     @State private var isShowingProfileManagement = false
     @State private var multiplayerInputMode: InputMode = .free
     @State private var multiplayerUndoPermission: UndoPermission = .anyPlayer
-    @State private var isShowingHosting = false
-    @State private var isShowingJoining = false
+    @State private var multiplayerModeSelection: MultiplayerSetupMode = .off
+    @State private var isJoinScannerVisible = false
+    @State private var joinScannerResetID = UUID()
+    @State private var pendingMultiplayerDisconnectRole: SessionRole?
     @StateObject private var historyStore = GameHistoryStore()
 
     private var maxPlayers: Int {
@@ -92,32 +110,31 @@ struct NewGameSetupView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)
-                        .disabled(session.role == .joiner)
+                        .disabled(!canStartGame)
                 }
             }
             .sheet(isPresented: $isShowingProfileManagement) {
                 PlayerProfileView(store: profileStore, historyStore: historyStore)
             }
-            .sheet(isPresented: $isShowingHosting) {
-                NavigationStack {
-                    QRHostView(
-                        session: session,
-                        players: setupPlayersAsPlayers,
-                        onDismiss: { isShowingHosting = false }
-                    )
+            .alert(
+                pendingMultiplayerDisconnectRole == .host ? L10n.string("Stop Local Multiplayer") : L10n.string("Leave Session"),
+                isPresented: Binding(
+                    get: { pendingMultiplayerDisconnectRole != nil },
+                    set: { if !$0 { pendingMultiplayerDisconnectRole = nil } }
+                ),
+                presenting: pendingMultiplayerDisconnectRole
+            ) { role in
+                Button(role == .host ? L10n.string("Stop Local Multiplayer") : L10n.string("Leave Session"), role: .destructive) {
+                    handleConfirmedMultiplayerDisconnect()
                 }
-            }
-            .sheet(isPresented: $isShowingJoining) {
-                NavigationStack {
-                    QRJoinerView(
-                        session: session,
-                        onDismiss: { isShowingJoining = false }
-                    )
+                Button(L10n.string("Cancel"), role: .cancel) {
+                    pendingMultiplayerDisconnectRole = nil
+                    multiplayerModeSelection = role == .host ? .host : .join
                 }
-            }
-            .onChange(of: session.gameHasStarted) { _, started in
-                guard started && session.role == .joiner else { return }
-                isShowingJoining = false
+            } message: { role in
+                Text(role == .host
+                    ? L10n.string("This will end the session for all connected devices.")
+                    : L10n.string("You will be disconnected from the host's game."))
             }
         }
         .onAppear {
@@ -132,6 +149,24 @@ struct NewGameSetupView: View {
             if session.role != .none {
                 multiplayerInputMode = session.inputMode
                 multiplayerUndoPermission = session.undoPermission
+                multiplayerModeSelection = session.role == .host ? .host : .join
+            } else {
+                multiplayerModeSelection = .off
+            }
+        }
+        .onChange(of: multiplayerModeSelection) { _, mode in
+            handleMultiplayerModeSelectionChange(mode)
+        }
+        .onChange(of: session.role) { _, role in
+            switch role {
+            case .host:
+                multiplayerModeSelection = .host
+                isJoinScannerVisible = false
+            case .joiner:
+                multiplayerModeSelection = .join
+            case .none:
+                multiplayerModeSelection = .off
+                isJoinScannerVisible = false
             }
         }
         .onChange(of: gameMode) { _, mode in
@@ -377,95 +412,54 @@ struct NewGameSetupView: View {
     @ViewBuilder
     private var multiplayerSection: some View {
         Section("Local Multiplayer") {
-            switch session.role {
-            case .none:
-                Picker("Input Mode", selection: $multiplayerInputMode) {
-                    ForEach(InputMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                Text(multiplayerInputMode.explanation)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            multiplayerModeSelector
 
-                Picker("Undo", selection: $multiplayerUndoPermission) {
-                    ForEach(UndoPermission.allCases) { permission in
-                        Text(permission.label).tag(permission)
-                    }
-                }
-
-                Button {
-                    session.hostSession(inputMode: multiplayerInputMode, undoPermission: multiplayerUndoPermission)
-                    isShowingHosting = true
-                } label: {
-                    Label("Host a Game", systemImage: "qrcode")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-
-                Button {
-                    isShowingJoining = true
-                } label: {
-                    Label("Join a Game", systemImage: "camera")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-
+            switch multiplayerModeSelection {
+            case .off:
+                EmptyView()
             case .host:
-                Label("Hosting: \(session.sessionToken)", systemImage: "wifi")
-                    .foregroundStyle(.secondary)
-                Text(session.connectedPeers.isEmpty
-                    ? "Waiting for devices to join…"
-                    : "\(session.connectedPeers.count + 1) device(s) connected")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Picker("Input Mode", selection: $multiplayerInputMode) {
-                    ForEach(InputMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .disabled(session.connectedPeers.isEmpty)
-                .onChange(of: multiplayerInputMode) { _, mode in
-                    session.updateSessionConfig(inputMode: mode, undoPermission: multiplayerUndoPermission)
-                }
-                Text(multiplayerInputMode.explanation)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Picker("Undo", selection: $multiplayerUndoPermission) {
-                    ForEach(UndoPermission.allCases) { permission in
-                        Text(permission.label).tag(permission)
-                    }
-                }
-                .disabled(session.connectedPeers.isEmpty)
-                .onChange(of: multiplayerUndoPermission) { _, permission in
-                    session.updateSessionConfig(inputMode: multiplayerInputMode, undoPermission: permission)
-                }
-
-                Button {
-                    isShowingHosting = true
-                } label: {
-                    Label("Manage Players", systemImage: "person.2")
-                }
-                Button("Stop Local Multiplayer", role: .destructive) {
-                    session.endSession()
-                }
-
-            case .joiner:
-                if session.connectedPeers.isEmpty {
-                    Label("Connecting…", systemImage: "wifi")
-                        .foregroundStyle(.secondary)
-                } else if session.gameHasStarted {
-                    Label("Game Starting", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    Label("Joined — Waiting for host to start", systemImage: "checkmark.circle")
-                        .foregroundStyle(.tint)
-                }
-                Button("Leave Session", role: .destructive) {
-                    session.endSession()
-                }
+                InlineHostLobbyView(
+                    session: session,
+                    inputMode: $multiplayerInputMode,
+                    undoPermission: $multiplayerUndoPermission,
+                    players: setupPlayersAsPlayers
+                )
+            case .join:
+                InlineJoinLobbyView(
+                    session: session,
+                    isScannerVisible: $isJoinScannerVisible,
+                    scannerResetID: joinScannerResetID,
+                    onDisconnect: { pendingMultiplayerDisconnectRole = .joiner }
+                )
             }
         }
+        .animation(.easeInOut(duration: 0.2), value: multiplayerModeSelection)
+    }
+
+    private var multiplayerModeSelector: some View {
+        HStack(spacing: 8) {
+            ForEach(MultiplayerSetupMode.allCases) { mode in
+                Button {
+                    multiplayerModeSelection = mode
+                } label: {
+                    Text(mode.label)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(multiplayerModeSelection == mode ? Color.accentColor : Color.clear)
+                        )
+                        .foregroundStyle(multiplayerModeSelection == mode ? Color.white : Color.primary)
+                }
+                .buttonStyle(.plain)
+                .disabled(mode == .host && session.role == .joiner)
+                .opacity(mode == .host && session.role == .joiner ? 0.45 : 1)
+            }
+        }
+        .padding(4)
+        .background(Color(.tertiarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var setupPlayersAsPlayers: [Player] {
@@ -477,6 +471,18 @@ struct NewGameSetupView: View {
                 colorHex: player.colorHex,
                 profileID: player.profileID
             )
+        }
+    }
+
+    private var canStartGame: Bool {
+        guard session.role != .joiner else { return false }
+        guard session.role == .host, multiplayerInputMode != .free else { return true }
+        return allMultiplayerPlayersAssigned
+    }
+
+    private var allMultiplayerPlayersAssigned: Bool {
+        setupPlayersAsPlayers.allSatisfy { player in
+            assignedDeviceID(for: player.id, in: session.playerAssignments) != nil
         }
     }
 
@@ -506,6 +512,52 @@ struct NewGameSetupView: View {
 
     private func movePlayers(from source: IndexSet, to destination: Int) {
         setupPlayers.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func assignedDeviceID(for playerID: UUID, in assignments: [String: [String]]) -> String? {
+        let playerIDString = playerID.uuidString
+        for (deviceID, playerIDs) in assignments {
+            if playerIDs.contains(playerIDString) {
+                return deviceID
+            }
+        }
+        return nil
+    }
+
+    private func handleConfirmedMultiplayerDisconnect() {
+        pendingMultiplayerDisconnectRole = nil
+        isJoinScannerVisible = false
+        joinScannerResetID = UUID()
+        multiplayerModeSelection = .off
+        session.endSession()
+    }
+
+    private func handleMultiplayerModeSelectionChange(_ mode: MultiplayerSetupMode) {
+        switch mode {
+        case .off:
+            isJoinScannerVisible = false
+            joinScannerResetID = UUID()
+            guard session.role != .none else { return }
+            pendingMultiplayerDisconnectRole = session.role
+        case .host:
+            guard session.role != .joiner else {
+                multiplayerModeSelection = .join
+                return
+            }
+            guard session.role != .host else { return }
+            if session.role != .none {
+                session.endSession()
+            }
+            isJoinScannerVisible = false
+            joinScannerResetID = UUID()
+            session.hostSession(inputMode: multiplayerInputMode, undoPermission: multiplayerUndoPermission)
+        case .join:
+            if session.role == .host {
+                session.endSession()
+            }
+            joinScannerResetID = UUID()
+            isJoinScannerVisible = true
+        }
     }
 
     private func profileButtonLabel(for player: SetupPlayer) -> String? {

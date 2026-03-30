@@ -149,7 +149,7 @@ struct GameControlBar: View {
                 Image(systemName: "plus.circle")
             }
             .buttonStyle(.bordered)
-            .disabled(sessionRole != .none && isLegInProgress)
+            .disabled(sessionRole == .joiner)
 
             Button(action: onRestartLeg) {
                 Image(systemName: "arrow.clockwise")
@@ -465,10 +465,18 @@ struct ReconnectBannerView: View {
 
     var body: some View {
         VStack {
-            HStack(spacing: 8) {
-                ProgressView()
-                Text(L10n.string("Reconnecting…"))
-                    .font(.subheadline.weight(.medium))
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(L10n.string("Reconnecting…"))
+                        .font(.subheadline.weight(.medium))
+                }
+
+                Spacer(minLength: 0)
+
+                Button(L10n.string("Abort Connection"), action: onAbort)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -477,11 +485,38 @@ struct ReconnectBannerView: View {
             .padding(.top, 8)
 
             Spacer()
+        }
+    }
+}
 
-            Button(L10n.string("Abort Connection"), action: onAbort)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
-                .padding(.bottom, 24)
+struct HostPreparingNewGameBannerView: View {
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.18)
+                .ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                ProgressView()
+                    .controlSize(.large)
+
+                VStack(spacing: 4) {
+                    Text(L10n.string("Host is starting a new game…"))
+                        .font(.headline.weight(.semibold))
+                    Text(L10n.string("Please wait…"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
+            .frame(maxWidth: 280)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 18, x: 0, y: 8)
         }
     }
 }
