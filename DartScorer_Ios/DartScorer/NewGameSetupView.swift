@@ -4,6 +4,8 @@ struct NewGameSetupView: View {
     @Binding var setupPlayers: [SetupPlayer]
     @Binding var gameMode: GameMode
     @Binding var practiceMode: PracticeMode
+    @Binding var practiceCompetitiveEnabled: Bool
+    @Binding var practiceSuccessesToWin: Int
     @Binding var finishRule: FinishRule
     @Binding var inRule: InRule
     @Binding var startScore: StartScoreOption
@@ -58,6 +60,14 @@ struct NewGameSetupView: View {
                 return L10n.string("A random double is called. Hit it within the visit to score a success.")
             case .aroundTheClock:
                 return L10n.string("Work through 1 to 20 and Bull in order. Any multiplier counts for the current target.")
+            case .first9Challenge:
+                return L10n.string("Play exactly three visits and compare the first 9 average.")
+            case .pressureFinishes:
+                return L10n.string("Get a random checkout target. Miss it within the visit and your success count resets to zero.")
+            case .streakMode:
+                return L10n.string("Keep hitting the same called target. A miss resets your streak and rolls a new call.")
+            case .randomTarget:
+                return L10n.string("A target is called each visit. Hit it once to score and move to the next call.")
             }
         case .cricket:
             return L10n.string("Hit 20 through 15 and Bull to close them. Extra marks score only if opponents are still open.")
@@ -133,11 +143,19 @@ struct NewGameSetupView: View {
             if mode == .practice {
                 setModeEnabled = false
                 legsToWin = 1
+                if !practiceMode.supportsCompetitiveGoal {
+                    practiceCompetitiveEnabled = false
+                }
                 if setupPlayers.isEmpty {
                     setupPlayers = [SetupPlayer(name: "Player 1", defaultName: "Player 1")]
                 }
             } else if setupPlayers.count < 2 {
                 setupPlayers.append(SetupPlayer(name: "Player 2", defaultName: "Player 2"))
+            }
+        }
+        .onChange(of: practiceMode) { _, mode in
+            if !mode.supportsCompetitiveGoal {
+                practiceCompetitiveEnabled = false
             }
         }
     }
@@ -206,6 +224,18 @@ struct NewGameSetupView: View {
                     }
                 }
                 .pickerStyle(.menu)
+
+                if practiceMode.supportsCompetitiveGoal {
+                    Toggle("Competitive Practice", isOn: $practiceCompetitiveEnabled)
+
+                    if practiceCompetitiveEnabled && setupPlayers.count > 1 {
+                        Stepper(
+                            L10n.format("First to %@ Wins", "\(practiceSuccessesToWin)"),
+                            value: $practiceSuccessesToWin,
+                            in: 1...20
+                        )
+                    }
+                }
             }
         }
     }

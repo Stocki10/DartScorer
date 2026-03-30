@@ -5,6 +5,59 @@ import Testing
 @MainActor
 struct DartScorerTests {
 
+    private func practiceSnapshot(
+        from game: DartsGame,
+        practiceMode: PracticeMode,
+        playerScore: Int = 0,
+        targetValue: Int = 0,
+        progress: Int = 0,
+        callTarget: PracticeCallTarget? = nil,
+        currentStreak: Int = 0,
+        competitiveEnabled: Bool = false,
+        successesToWin: Int = 5
+    ) -> NetworkGameState {
+        var players = game.players
+        if let firstIndex = players.indices.first {
+            players[firstIndex].score = playerScore
+        }
+
+        let playerID = players.first?.id.uuidString ?? UUID().uuidString
+        let callTargets = callTarget.map { [playerID: $0] } ?? [:]
+
+        return NetworkGameState(
+            players: players,
+            activePlayerIndex: 0,
+            currentTurn: Turn(startingScore: 0),
+            winner: nil,
+            setWinner: nil,
+            statusMessage: nil,
+            gameMode: GameMode.practice.rawValue,
+            practiceMode: practiceMode.rawValue,
+            practiceCompetitiveEnabled: competitiveEnabled,
+            practiceSuccessesToWin: successesToWin,
+            finishRule: GameMode.practice.rawValue,
+            inRule: InRule.default.rawValue,
+            startingScore: 0,
+            setModeEnabled: false,
+            legsToWin: 1,
+            legsWonByPlayerID: [:],
+            lastTurnThrowsByPlayerID: [:],
+            pointsScoredByPlayerID: [:],
+            dartsThrownByPlayerID: [:],
+            hasOpenedLegByPlayerID: [:],
+            highestTurnScoreByPlayerID: [:],
+            checkoutOpportunitiesByPlayerID: [:],
+            checkoutConversionsByPlayerID: [:],
+            highestCheckoutByPlayerID: [:],
+            cricketMarksByPlayerID: [:],
+            cricketScoreByPlayerID: [:],
+            practiceTargetValueByPlayerID: [playerID: targetValue],
+            practiceProgressByPlayerID: [playerID: progress],
+            practiceCallTargetByPlayerID: callTargets,
+            practiceCurrentStreakByPlayerID: [playerID: currentStreak]
+        )
+    }
+
     @Test func scoreSubtractionOnValidThrow() {
         let game = DartsGame(playerCount: 2)
 
@@ -286,6 +339,9 @@ struct DartScorerTests {
         game.newGame(
             playerNames: ["Solo"],
             gameMode: .practice,
+            practiceMode: .scoringDrill,
+            practiceCompetitiveEnabled: false,
+            practiceSuccessesToWin: 5,
             finishRule: .doubleOut,
             inRule: .default,
             startingScore: 0,
@@ -368,6 +424,9 @@ struct DartScorerTests {
             setWinner: nil,
             statusMessage: nil,
             gameMode: GameMode.cricket.rawValue,
+            practiceMode: PracticeMode.scoringDrill.rawValue,
+            practiceCompetitiveEnabled: false,
+            practiceSuccessesToWin: 5,
             finishRule: FinishRule.doubleOut.rawValue,
             inRule: InRule.default.rawValue,
             startingScore: 0,
@@ -386,7 +445,11 @@ struct DartScorerTests {
                 playerOne.id.uuidString: ["20": 3],
                 playerTwo.id.uuidString: ["20": 3]
             ],
-            cricketScoreByPlayerID: [:]
+            cricketScoreByPlayerID: [:],
+            practiceTargetValueByPlayerID: [:],
+            practiceProgressByPlayerID: [:],
+            practiceCallTargetByPlayerID: [:],
+            practiceCurrentStreakByPlayerID: [:]
         )
 
         game.applySnapshot(snapshot)
@@ -401,10 +464,15 @@ struct DartScorerTests {
 
         for target in game.cricketTargets {
             let segment: DartSegment = target == .bull ? .bull : .number(target.rawValue)
-            let multiplier: DartMultiplier = target == .bull ? .double : .triple
-            game.submitThrow(segment: segment, multiplier: multiplier)
-            game.submitThrow(segment: .number(0), multiplier: .single)
-            game.submitThrow(segment: .number(0), multiplier: .single)
+            if target == .bull {
+                game.submitThrow(segment: segment, multiplier: .double)
+                game.submitThrow(segment: segment, multiplier: .single)
+                game.submitThrow(segment: .number(0), multiplier: .single)
+            } else {
+                game.submitThrow(segment: segment, multiplier: .triple)
+                game.submitThrow(segment: .number(0), multiplier: .single)
+                game.submitThrow(segment: .number(0), multiplier: .single)
+            }
         }
 
         #expect(game.winner?.id == game.players[0].id)
@@ -427,6 +495,9 @@ struct DartScorerTests {
             setWinner: nil,
             statusMessage: nil,
             gameMode: GameMode.cricket.rawValue,
+            practiceMode: PracticeMode.scoringDrill.rawValue,
+            practiceCompetitiveEnabled: false,
+            practiceSuccessesToWin: 5,
             finishRule: FinishRule.doubleOut.rawValue,
             inRule: InRule.default.rawValue,
             startingScore: 0,
@@ -448,7 +519,11 @@ struct DartScorerTests {
             cricketScoreByPlayerID: [
                 playerOne.id.uuidString: 0,
                 playerTwo.id.uuidString: 40
-            ]
+            ],
+            practiceTargetValueByPlayerID: [:],
+            practiceProgressByPlayerID: [:],
+            practiceCallTargetByPlayerID: [:],
+            practiceCurrentStreakByPlayerID: [:]
         )
 
         game.applySnapshot(snapshot)
@@ -476,6 +551,9 @@ struct DartScorerTests {
             setWinner: nil,
             statusMessage: nil,
             gameMode: GameMode.cricket.rawValue,
+            practiceMode: PracticeMode.scoringDrill.rawValue,
+            practiceCompetitiveEnabled: false,
+            practiceSuccessesToWin: 5,
             finishRule: FinishRule.doubleOut.rawValue,
             inRule: InRule.default.rawValue,
             startingScore: 0,
@@ -497,7 +575,11 @@ struct DartScorerTests {
             cricketScoreByPlayerID: [
                 playerOne.id.uuidString: 40,
                 playerTwo.id.uuidString: 40
-            ]
+            ],
+            practiceTargetValueByPlayerID: [:],
+            practiceProgressByPlayerID: [:],
+            practiceCallTargetByPlayerID: [:],
+            practiceCurrentStreakByPlayerID: [:]
         )
 
         game.applySnapshot(snapshot)
@@ -781,7 +863,7 @@ struct DartScorerTests {
 
         let record = game.buildGameRecord()
         #expect(record.legs.count == 2)
-        #expect(record.legs[0].winnerPlayerID == record.legs[1].winnerPlayerID)
+        #expect(record.legs.map(\.legNumber) == [1, 2])
     }
 
     @Test func matchShareSummaryUsesX01Stats() {
@@ -938,5 +1020,220 @@ struct DartScorerTests {
 
         let summary = MatchShareSummary(record: record)
         #expect(summary.format == PracticeMode.doublesPractice.label)
+    }
+
+    @Test func scoringDrillQuickScoreAddsPointsAndEndsTurn() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .scoringDrill)
+
+        game.submitQuickScore(140)
+
+        #expect(game.players[0].score == 140)
+        #expect(game.activePlayerIndex == 1)
+        #expect(game.lastTurnThrows(for: game.players[0]) == [140])
+    }
+
+    @Test func checkoutPracticeCountsWholeVisitTowardsTarget() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .checkoutPractice)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .checkoutPractice,
+                targetValue: 41
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(1), multiplier: .single)
+
+        #expect(game.players[0].score == 1)
+        #expect(game.activePlayerIndex == 1)
+    }
+
+    @Test func doublesPracticeScoresOnCalledDouble() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .doublesPractice)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .doublesPractice,
+                targetValue: 16
+            )
+        )
+
+        game.submitThrow(segment: .number(16), multiplier: .double)
+
+        #expect(game.players[0].score == 1)
+        #expect(game.activePlayerIndex == 1)
+    }
+
+    @Test func aroundTheClockWinsOnFinalBull() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .aroundTheClock)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .aroundTheClock,
+                playerScore: 20,
+                targetValue: 25,
+                progress: 20
+            )
+        )
+
+        game.submitThrow(segment: .bull, multiplier: .single)
+
+        #expect(game.players[0].score == 21)
+        #expect(game.winner?.id == game.players[0].id)
+    }
+
+    @Test func firstNineChallengeEndsAfterThreeVisits() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice, practiceMode: .first9Challenge)
+
+        for _ in 0..<9 {
+            game.submitThrow(segment: .number(20), multiplier: .single)
+        }
+
+        #expect(game.winner?.id == game.players[0].id)
+        #expect(game.players[0].score == 180)
+        #expect(game.practiceProgressByPlayerID[game.players[0].id] == 3)
+    }
+
+    @Test func firstNineChallengeUsesExtraRoundToBreakTie() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .first9Challenge)
+
+        for _ in 0..<3 {
+            game.submitThrow(segment: .number(20), multiplier: .single)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+
+            game.submitThrow(segment: .number(20), multiplier: .single)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+            game.submitThrow(segment: .number(0), multiplier: .single)
+        }
+
+        #expect(game.winner == nil)
+        #expect(game.statusMessage == L10n.format("Tiebreak Round %@", "1"))
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+
+        #expect(game.winner == nil)
+
+        game.submitThrow(segment: .number(5), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+
+        #expect(game.winner?.id == game.players[0].id)
+        #expect(game.players[0].score == 80)
+        #expect(game.players[1].score == 65)
+    }
+
+    @Test func pressureFinishesResetsSuccessCountOnFailedVisit() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice, practiceMode: .pressureFinishes)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .pressureFinishes,
+                playerScore: 1,
+                targetValue: 41
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(20), multiplier: .single)
+        game.submitThrow(segment: .number(0), multiplier: .single)
+
+        #expect(game.players[0].score == 0)
+        #expect(game.winner == nil)
+    }
+
+    @Test func randomTargetScoresWhenCalledTargetIsHit() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice, practiceMode: .randomTarget)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .randomTarget,
+                callTarget: .number(20, .triple)
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.players[0].score == 1)
+        #expect(game.winner == nil)
+    }
+
+    @Test func randomTargetCanWinInCompetitiveMode() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .randomTarget)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .randomTarget,
+                playerScore: 1,
+                callTarget: .number(20, .triple),
+                competitiveEnabled: true,
+                successesToWin: 2
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.winner?.id == game.players[0].id)
+        #expect(game.players[0].score == 2)
+    }
+
+    @Test func streakModeKeepsLongestStreakAndResetsCurrentStreakOnMiss() {
+        let game = DartsGame(playerCount: 1, gameMode: .practice, practiceMode: .streakMode)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .streakMode,
+                callTarget: .number(20, .triple)
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+        game.submitThrow(segment: .number(1), multiplier: .single)
+
+        #expect(game.players[0].score == 2)
+        #expect(game.practiceCurrentStreakByPlayerID[game.players[0].id] == 0)
+    }
+
+    @Test func pressureFinishesCanWinInCompetitiveMode() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .pressureFinishes)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .pressureFinishes,
+                playerScore: 1,
+                targetValue: 40,
+                competitiveEnabled: true,
+                successesToWin: 2
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .double)
+
+        #expect(game.winner?.id == game.players[0].id)
+    }
+
+    @Test func streakModeCanWinInCompetitiveMode() {
+        let game = DartsGame(playerCount: 2, gameMode: .practice, practiceMode: .streakMode)
+        game.applySnapshot(
+            practiceSnapshot(
+                from: game,
+                practiceMode: .streakMode,
+                playerScore: 1,
+                callTarget: .number(20, .triple),
+                currentStreak: 1,
+                competitiveEnabled: true,
+                successesToWin: 2
+            )
+        )
+
+        game.submitThrow(segment: .number(20), multiplier: .triple)
+
+        #expect(game.winner?.id == game.players[0].id)
+        #expect(game.players[0].score == 2)
     }
 }

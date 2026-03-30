@@ -51,6 +51,8 @@ struct NetworkGameState: Codable {
     let statusMessage: String?
     let gameMode: String
     let practiceMode: String
+    let practiceCompetitiveEnabled: Bool
+    let practiceSuccessesToWin: Int
     let finishRule: String
     let inRule: String
     let startingScore: Int
@@ -70,6 +72,8 @@ struct NetworkGameState: Codable {
     let cricketScoreByPlayerID: [String: Int]
     let practiceTargetValueByPlayerID: [String: Int]
     let practiceProgressByPlayerID: [String: Int]
+    let practiceCallTargetByPlayerID: [String: PracticeCallTarget]
+    let practiceCurrentStreakByPlayerID: [String: Int]
 }
 
 // MARK: - Session Config (broadcast from host to all peers)
