@@ -6,9 +6,9 @@ enum GameMode: String, CaseIterable, Identifiable, Codable {
     case practice = "Practice"
     case cricket = "Cricket"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .x01:
             return "X01"
@@ -30,11 +30,11 @@ enum PracticeMode: String, CaseIterable, Identifiable, Codable {
     case streakMode = "Streak Mode"
     case randomTarget = "Random Target"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var label: String { L10n.string(rawValue) }
+    nonisolated var label: String { L10n.string(rawValue) }
 
-    var supportsCompetitiveGoal: Bool {
+    nonisolated var supportsCompetitiveGoal: Bool {
         switch self {
         case .checkoutPractice, .doublesPractice, .pressureFinishes, .streakMode, .randomTarget:
             return true
@@ -48,7 +48,7 @@ enum PracticeCallTarget: Codable, Equatable {
     case number(Int, DartMultiplier)
     case bull(DartMultiplier)
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .number(let value, let multiplier):
             switch multiplier {
@@ -80,9 +80,9 @@ enum CricketTarget: Int, CaseIterable, Identifiable, Codable {
     case fifteen = 15
     case bull = 25
 
-    var id: Int { rawValue }
+    nonisolated var id: Int { rawValue }
 
-    var label: String {
+    nonisolated var label: String {
         self == .bull ? L10n.string("Bull") : "\(rawValue)"
     }
 }
@@ -91,9 +91,9 @@ enum FinishRule: String, CaseIterable, Identifiable, Codable {
     case doubleOut = "Double Out"
     case singleOut = "Single Out"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .doubleOut:
             return L10n.string("Double Out")
@@ -110,18 +110,18 @@ enum StartScoreOption: Int, CaseIterable, Identifiable {
     case score701 = 701
     case score1001 = 1001
 
-    var id: Int { rawValue }
+    nonisolated var id: Int { rawValue }
 
-    var label: String { "\(rawValue)" }
+    nonisolated var label: String { "\(rawValue)" }
 }
 
 enum InRule: String, CaseIterable, Identifiable, Codable {
     case `default` = "Default"
     case doubleIn = "Double In"
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .default:
             return L10n.string("Default")

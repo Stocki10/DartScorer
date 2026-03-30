@@ -5,21 +5,43 @@ struct GameHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedRecord: GameRecord?
     @State private var isShowingClearConfirmation = false
+    @State private var recordFilter = GameRecordFilter()
+
+    private var filteredRecords: [GameRecord] {
+        recordFilter.filteredRecords(from: store.records)
+    }
 
     var body: some View {
         NavigationStack {
-            Group {
-                if store.records.isEmpty {
-                    ContentUnavailableView(
-                        "No Games Yet",
-                        systemImage: "clock",
-                        description: Text("Completed games will appear here.")
-                    )
-                } else {
-                    List(store.records) { record in
-                        GameRecordRow(record: record)
-                            .contentShape(Rectangle())
-                            .onTapGesture { selectedRecord = record }
+            VStack(spacing: 0) {
+                if !store.records.isEmpty {
+                    GameRecordFilterControls(filter: $recordFilter)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
+
+                    Divider()
+                }
+
+                Group {
+                    if store.records.isEmpty {
+                        ContentUnavailableView(
+                            "No Games Yet",
+                            systemImage: "clock",
+                            description: Text("Completed games will appear here.")
+                        )
+                    } else if filteredRecords.isEmpty {
+                        ContentUnavailableView(
+                            "No Matching Games",
+                            systemImage: "line.3.horizontal.decrease.circle",
+                            description: Text("No games match the current filters.")
+                        )
+                    } else {
+                        List(filteredRecords) { record in
+                            GameRecordRow(record: record)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedRecord = record }
+                        }
                     }
                 }
             }
@@ -27,7 +49,7 @@ struct GameHistoryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Back") { dismiss() }
+                    ToolbarBackButton { dismiss() }
                 }
                 if !store.records.isEmpty {
                     ToolbarItem(placement: .destructiveAction) {
@@ -50,7 +72,8 @@ struct GameHistoryView: View {
     }
 }
 
-private struct GameRecordRow: View {
+@MainActor
+struct GameRecordRow: View {
     let record: GameRecord
 
     private var winner: PlayerGameResult? {
@@ -90,11 +113,18 @@ private struct GameRecordRow: View {
     }
 }
 
-private struct GameRecordDetailView: View {
+@MainActor
+struct GameRecordDetailView: View {
     let record: GameRecord
+    let showsToolbarBackButton: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var shareItems: [Any] = []
     @State private var isShowingShareSheet = false
+
+    init(record: GameRecord, showsToolbarBackButton: Bool = true) {
+        self.record = record
+        self.showsToolbarBackButton = showsToolbarBackButton
+    }
 
     private var isCricket: Bool {
         record.finishRule == "Cricket"
@@ -186,8 +216,10 @@ private struct GameRecordDetailView: View {
             .navigationTitle(formatLabel)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Back") { dismiss() }
+                if showsToolbarBackButton {
+                    ToolbarItem(placement: .cancellationAction) {
+                        ToolbarBackButton { dismiss() }
+                    }
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button(L10n.string("Share")) {
