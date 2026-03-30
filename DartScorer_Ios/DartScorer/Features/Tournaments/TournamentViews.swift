@@ -8,6 +8,7 @@ struct TournamentListView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isShowingCreateTournament = false
+    @State private var pendingDeleteTournamentIDs: [UUID] = []
 
     private var ongoingTournaments: [Tournament] {
         store.tournaments.filter { $0.status != .completed }
@@ -46,8 +47,7 @@ struct TournamentListView: View {
                             }
                         }
                         .onDelete { offsets in
-                            let ids = offsets.map { ongoingTournaments[$0].id }
-                            ids.forEach(store.delete)
+                            pendingDeleteTournamentIDs = offsets.map { ongoingTournaments[$0].id }
                         }
                     }
                 }
@@ -70,8 +70,7 @@ struct TournamentListView: View {
                             }
                         }
                         .onDelete { offsets in
-                            let ids = offsets.map { completedTournaments[$0].id }
-                            ids.forEach(store.delete)
+                            pendingDeleteTournamentIDs = offsets.map { completedTournaments[$0].id }
                         }
                     }
                 }
@@ -90,16 +89,45 @@ struct TournamentListView: View {
                 }
             }
             .sheet(isPresented: $isShowingCreateTournament) {
-                TournamentSetupView(profileStore: profileStore) { name, format, participants, rules in
+                TournamentSetupView(profileStore: profileStore) { name, format, roundRobinMode, participants, rules in
                     _ = store.createTournament(
                         name: name,
                         format: format,
                         participants: participants,
-                        rules: rules
+                        rules: rules,
+                        roundRobinMode: roundRobinMode
                     )
                 }
             }
+            .alert(deleteAlertTitle, isPresented: pendingDeleteAlertBinding) {
+                Button("Cancel", role: .cancel) {
+                    pendingDeleteTournamentIDs = []
+                }
+                Button("Delete", role: .destructive) {
+                    pendingDeleteTournamentIDs.forEach(store.delete)
+                    pendingDeleteTournamentIDs = []
+                }
+            } message: {
+                Text(deleteAlertMessage)
+            }
         }
+    }
+
+    private var pendingDeleteAlertBinding: Binding<Bool> {
+        Binding(
+            get: { !pendingDeleteTournamentIDs.isEmpty },
+            set: { if !$0 { pendingDeleteTournamentIDs = [] } }
+        )
+    }
+
+    private var deleteAlertTitle: String {
+        pendingDeleteTournamentIDs.count == 1 ? "Delete Tournament?" : "Delete Tournaments?"
+    }
+
+    private var deleteAlertMessage: String {
+        pendingDeleteTournamentIDs.count == 1
+            ? "This will permanently remove the tournament and its bracket or standings."
+            : "This will permanently remove the selected tournaments and their brackets or standings."
     }
 }
 
@@ -427,26 +455,52 @@ private struct TournamentMatchesSection: View {
         }
     }
 
+    private var roundRobinSections: [(title: String, matches: [TournamentMatch])] {
+        [
+            ("In Progress", sortedMatches.filter { $0.status == .inProgress }),
+            ("Ready", sortedMatches.filter { $0.status == .ready }),
+            ("Completed", sortedMatches.filter { $0.status == .completed })
+        ]
+        .filter { !$0.matches.isEmpty }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(sortedMatches) { match in
-                NavigationLink {
-                    TournamentMatchDetailView(
-                        store: store,
-                        historyStore: historyStore,
-                        tournamentID: tournament.id,
-                        matchID: match.id,
-                        onPlayMatch: onPlayMatch
-                    )
-                } label: {
-                    TournamentMatchCard(
-                        tournament: tournament,
-                        match: match
-                    )
+            if tournament.format == .roundRobin {
+                ForEach(roundRobinSections, id: \.title) { section in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(section.title)
+                            .font(.headline)
+
+                        ForEach(section.matches) { match in
+                            matchLink(for: match)
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
+            } else {
+                ForEach(sortedMatches) { match in
+                    matchLink(for: match)
+                }
             }
         }
+    }
+
+    private func matchLink(for match: TournamentMatch) -> some View {
+        NavigationLink {
+            TournamentMatchDetailView(
+                store: store,
+                historyStore: historyStore,
+                tournamentID: tournament.id,
+                matchID: match.id,
+                onPlayMatch: onPlayMatch
+            )
+        } label: {
+            TournamentMatchCard(
+                tournament: tournament,
+                match: match
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -467,7 +521,7 @@ private struct TournamentMatchCard: View {
             HStack {
                 Text(tournament.format == .singleElimination
                      ? (tournament.rounds.first(where: { $0.index == match.roundIndex })?.title ?? "Match")
-                     : "Match \(match.slotIndex + 1)")
+                     : roundRobinMatchLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -537,6 +591,18 @@ private struct TournamentMatchCard: View {
         }
     }
 
+    private var roundRobinMatchLabel: String {
+        if tournament.roundRobinMode == .double {
+            return "Round \(match.roundIndex + 1) • Match \(roundRobinMatchNumber)"
+        }
+        return "Match \(match.slotIndex + 1)"
+    }
+
+    private var roundRobinMatchNumber: Int {
+        let matchesPerCycle = max(1, tournament.participants.count * max(tournament.participants.count - 1, 0) / 2)
+        return (match.slotIndex % matchesPerCycle) + 1
+    }
+
     private var statusColor: Color {
         switch match.status {
         case .pending:
@@ -582,6 +648,9 @@ private struct TournamentMatchDetailView: View {
         guard let tournament, let match else { return "Match" }
         if tournament.format == .singleElimination {
             return tournament.rounds.first(where: { $0.index == match.roundIndex })?.title ?? "Match"
+        }
+        if tournament.roundRobinMode == .double {
+            return "Round \(match.roundIndex + 1) • Match \(roundRobinMatchNumber(match, tournament: tournament))"
         }
         return "Match \(match.slotIndex + 1)"
     }
@@ -689,11 +758,16 @@ private struct TournamentMatchDetailView: View {
     }
 
     private func matchDetailSubtitle(for tournament: Tournament, match: TournamentMatch) -> String {
-        let matchLabel = "Match \(match.slotIndex + 1)"
         if tournament.format == .singleElimination {
+            let matchLabel = "Match \(match.slotIndex + 1)"
             return "\(tournament.name) • \(matchLabel)"
         }
         return tournament.rules.formatSummary
+    }
+
+    private func roundRobinMatchNumber(_ match: TournamentMatch, tournament: Tournament) -> Int {
+        let matchesPerCycle = max(1, tournament.participants.count * max(tournament.participants.count - 1, 0) / 2)
+        return (match.slotIndex % matchesPerCycle) + 1
     }
 
     private func detailParticipantRow(_ participant: TournamentParticipant?, isWinner: Bool) -> some View {
@@ -762,11 +836,13 @@ private struct TournamentMatchDetailView: View {
 
 struct TournamentSetupView: View {
     @ObservedObject var profileStore: PlayerProfileStore
-    let onCreate: (String, TournamentFormat, [TournamentParticipant], TournamentMatchRules) -> Void
+    let onCreate: (String, TournamentFormat, TournamentRoundRobinMode, [TournamentParticipant], TournamentMatchRules) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var tournamentName = ""
     @State private var format: TournamentFormat = .singleElimination
+    @State private var roundRobinMode: TournamentRoundRobinMode = .single
+    @State private var randomSeedingEnabled = false
     @State private var rules = TournamentMatchRules()
     @State private var selectedProfileIDs: [UUID] = []
 
@@ -781,7 +857,8 @@ struct TournamentSetupView: View {
     }
 
     private var selectedPlayersListHeight: CGFloat {
-        max(180, CGFloat(selectedProfiles.count) * 52 + 16)
+        let rowHeight: CGFloat = 44
+        return max(100, CGFloat(selectedProfiles.count) * rowHeight + 8)
     }
 
     var body: some View {
@@ -796,40 +873,21 @@ struct TournamentSetupView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                }
 
-                Section("Player Order") {
-                    if selectedProfiles.isEmpty {
-                        Text("Select at least two profiles to start a tournament.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Drag to reorder seeded players")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-
-                        List {
-                            ForEach(selectedProfiles) { profile in
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(Color(hex: profile.colorHex) ?? .accentColor)
-                                        .frame(width: 12, height: 12)
-
-                                    Text(profile.name)
-                                        .font(.body.weight(.medium))
-
-                                    Spacer()
-                                }
-                                .frame(height: 24)
-                                .padding(.vertical, 0)
+                    if format == .roundRobin {
+                        Picker("Round Robin", selection: $roundRobinMode) {
+                            ForEach(TournamentRoundRobinMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
                             }
-                            .onMove(perform: moveSelectedProfiles)
                         }
-                        .listStyle(.plain)
-                        .scrollDisabled(true)
-                        .frame(height: selectedPlayersListHeight)
-                        .environment(\.defaultMinListRowHeight, 38)
-                        .environment(\.editMode, .constant(.active))
+                        .pickerStyle(.menu)
                     }
+
+                    Toggle("Random Seeding", isOn: $randomSeedingEnabled)
+                        .onChange(of: randomSeedingEnabled) { _, isEnabled in
+                            guard isEnabled else { return }
+                            randomizeSelectedProfiles()
+                        }
                 }
 
                 Section("Available Profiles") {
@@ -862,6 +920,42 @@ struct TournamentSetupView: View {
                     }
                 }
 
+                if !randomSeedingEnabled {
+                    Section("Player Order") {
+                        if selectedProfiles.isEmpty {
+                            Text("Select at least two profiles to start a tournament.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Drag to reorder seeded players")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+
+                            List {
+                                ForEach(selectedProfiles) { profile in
+                                    HStack(spacing: 12) {
+                                        Circle()
+                                            .fill(Color(hex: profile.colorHex) ?? .accentColor)
+                                            .frame(width: 12, height: 12)
+
+                                        Text(profile.name)
+                                            .font(.body.weight(.medium))
+
+                                        Spacer()
+                                    }
+                                    .frame(minHeight: 28)
+                                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                                }
+                                .onMove(perform: moveSelectedProfiles)
+                            }
+                            .listStyle(.plain)
+                            .scrollDisabled(true)
+                            .frame(height: selectedPlayersListHeight)
+                            .environment(\.defaultMinListRowHeight, 44)
+                            .environment(\.editMode, .constant(.active))
+                        }
+                    }
+                }
+
                 Section("Match Rules") {
                     CompetitiveTournamentRulesEditor(rules: $rules)
                 }
@@ -882,7 +976,7 @@ struct TournamentSetupView: View {
                                 seed: index + 1
                             )
                         }
-                        onCreate(tournamentName, format, participants, rules)
+                        onCreate(tournamentName, format, roundRobinMode, participants, rules)
                         dismiss()
                     }
                     .disabled(!canCreate)
@@ -897,10 +991,20 @@ struct TournamentSetupView: View {
         } else {
             selectedProfileIDs.append(profileID)
         }
+
+        if randomSeedingEnabled {
+            randomizeSelectedProfiles()
+        }
     }
 
     private func moveSelectedProfiles(from source: IndexSet, to destination: Int) {
+        guard !randomSeedingEnabled else { return }
         selectedProfileIDs.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func randomizeSelectedProfiles() {
+        guard selectedProfileIDs.count > 1 else { return }
+        selectedProfileIDs.shuffle()
     }
 }
 
