@@ -302,6 +302,22 @@ struct CheckoutBadgeView: View {
     }
 }
 
+struct PracticeObjectiveBadgeView: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline)
+            .fontWeight(.bold)
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
 struct ScoreEntryModePicker: View {
     @Binding var selection: ScoreEntryMode
 

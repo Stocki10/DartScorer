@@ -9,6 +9,8 @@ struct DartsGameView: View {
     @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
     @AppStorage("newGameMode") private var storedNewGameModeRaw = GameMode.x01.rawValue
     @AppStorage("newGamePracticeMode") private var storedNewGamePracticeModeRaw = PracticeMode.scoringDrill.rawValue
+    @AppStorage("newGamePracticeCompetitiveEnabled") private var storedPracticeCompetitiveEnabled = false
+    @AppStorage("newGamePracticeSuccessesToWin") private var storedPracticeSuccessesToWin = 5
     @AppStorage("newGameFinishRule") private var storedNewGameFinishRuleRaw = FinishRule.doubleOut.rawValue
     @AppStorage("newGameInRule") private var storedNewGameInRuleRaw = InRule.default.rawValue
     @AppStorage("newGameStartScore") private var storedNewGameStartScoreRaw = StartScoreOption.score501.rawValue
@@ -24,6 +26,8 @@ struct DartsGameView: View {
     @State private var setupPlayers: [SetupPlayer] = []
     @State private var setupGameMode: GameMode = .x01
     @State private var setupPracticeMode: PracticeMode = .scoringDrill
+    @State private var setupPracticeCompetitiveEnabled = false
+    @State private var setupPracticeSuccessesToWin = 5
     @State private var setupFinishRule: FinishRule = .doubleOut
     @State private var setupInRule: InRule = .default
     @State private var setupStartScore: StartScoreOption = .score501
@@ -93,8 +97,14 @@ struct DartsGameView: View {
         case "Practice mode", "Close all numbers and finish level or ahead.":
             return nil
         default:
-            return statusMessage
+            return game.gameMode == .practice ? nil : statusMessage
         }
+    }
+
+    private var practiceObjectiveMessage: String? {
+        guard game.gameMode == .practice else { return nil }
+        guard let statusMessage = game.statusMessage, statusMessage != "Practice mode" else { return nil }
+        return statusMessage
     }
 
     private var currentMatchShareSummary: MatchShareSummary? {
@@ -168,6 +178,9 @@ struct DartsGameView: View {
                         isBogey: game.isCurrentScoreBogey
                     )
                     .padding(.horizontal)
+                } else if let practiceObjectiveMessage {
+                    PracticeObjectiveBadgeView(message: practiceObjectiveMessage)
+                        .padding(.horizontal)
                 }
 
                 Divider()
@@ -237,6 +250,8 @@ struct DartsGameView: View {
                 setupPlayers: $setupPlayers,
                 gameMode: $setupGameMode,
                 practiceMode: $setupPracticeMode,
+                practiceCompetitiveEnabled: $setupPracticeCompetitiveEnabled,
+                practiceSuccessesToWin: $setupPracticeSuccessesToWin,
                 finishRule: $setupFinishRule,
                 inRule: $setupInRule,
                 startScore: $setupStartScore,
@@ -346,6 +361,8 @@ struct DartsGameView: View {
             players: playerObjects,
             gameMode: setupGameMode,
             practiceMode: setupPracticeMode,
+            practiceCompetitiveEnabled: setupPracticeCompetitiveEnabled,
+            practiceSuccessesToWin: setupPracticeSuccessesToWin,
             finishRule: setupFinishRule,
             inRule: setupInRule,
             startingScore: setupGameMode == .practice ? 0 : setupStartScore.rawValue,
@@ -494,6 +511,8 @@ struct DartsGameView: View {
         setupFinishRule = FinishRule(rawValue: storedNewGameFinishRuleRaw) ?? game.finishRule
         setupGameMode = GameMode(rawValue: storedNewGameModeRaw) ?? game.gameMode
         setupPracticeMode = PracticeMode(rawValue: storedNewGamePracticeModeRaw) ?? game.practiceMode
+        setupPracticeCompetitiveEnabled = storedPracticeCompetitiveEnabled
+        setupPracticeSuccessesToWin = max(1, storedPracticeSuccessesToWin)
         setupInRule = InRule(rawValue: storedNewGameInRuleRaw) ?? game.inRule
         setupStartScore = StartScoreOption(rawValue: storedNewGameStartScoreRaw)
             ?? (StartScoreOption(rawValue: game.startingScore) ?? .score501)
@@ -564,6 +583,8 @@ struct DartsGameView: View {
         storedNewGameFinishRuleRaw = setupFinishRule.rawValue
         storedNewGameModeRaw = setupGameMode.rawValue
         storedNewGamePracticeModeRaw = setupPracticeMode.rawValue
+        storedPracticeCompetitiveEnabled = setupPracticeCompetitiveEnabled
+        storedPracticeSuccessesToWin = max(1, setupPracticeSuccessesToWin)
         storedNewGameInRuleRaw = setupInRule.rawValue
         storedNewGameStartScoreRaw = setupStartScore.rawValue
         storedNewGameSetModeEnabled = setupSetModeEnabled
