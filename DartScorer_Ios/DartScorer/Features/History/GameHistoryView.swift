@@ -319,9 +319,11 @@ struct GameRecordDetailView: View {
                 }
             }
         }
-        .sheet(item: $sharePayload) { payload in
-            ShareSheet(items: payload.items)
-        }
+            .sheet(item: $sharePayload) { payload in
+                ShareSheet(items: payload.items) {
+                    sharePayload = nil
+                }
+            }
     }
 }
 

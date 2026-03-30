@@ -173,6 +173,14 @@ struct PlayerGameResult: Identifiable {
     let totalFirstNineDarts: Int
 }
 
+struct GameRecordTournamentContext: Codable, Equatable {
+    let tournamentID: UUID
+    let tournamentName: String
+    let tournamentMatchID: UUID
+    let tournamentFormat: TournamentFormat
+    let roundTitle: String
+}
+
 extension PlayerGameResult: Codable {
     enum CodingKeys: String, CodingKey {
         case id, name, average, firstNineAverage, highestTurnScore, highestScore
@@ -210,11 +218,12 @@ struct GameRecord: Codable, Identifiable {
     let startingScore: Int
     let finishRule: String
     let practiceMode: String?
+    let tournamentContext: GameRecordTournamentContext?
     let playerResults: [PlayerGameResult]
     let legs: [LegRecord]
 
     enum CodingKeys: String, CodingKey {
-        case id, date, startingScore, finishRule, practiceMode, playerResults, legs
+        case id, date, startingScore, finishRule, practiceMode, tournamentContext, playerResults, legs
     }
 
     init(
@@ -223,6 +232,7 @@ struct GameRecord: Codable, Identifiable {
         startingScore: Int,
         finishRule: String,
         practiceMode: String? = nil,
+        tournamentContext: GameRecordTournamentContext? = nil,
         playerResults: [PlayerGameResult],
         legs: [LegRecord]
     ) {
@@ -231,6 +241,7 @@ struct GameRecord: Codable, Identifiable {
         self.startingScore = startingScore
         self.finishRule = finishRule
         self.practiceMode = practiceMode
+        self.tournamentContext = tournamentContext
         self.playerResults = playerResults
         self.legs = legs
     }
@@ -242,6 +253,7 @@ struct GameRecord: Codable, Identifiable {
         startingScore = try c.decode(Int.self, forKey: .startingScore)
         finishRule = try c.decode(String.self, forKey: .finishRule)
         practiceMode = try? c.decode(String.self, forKey: .practiceMode)
+        tournamentContext = try? c.decode(GameRecordTournamentContext.self, forKey: .tournamentContext)
         playerResults = try c.decode([PlayerGameResult].self, forKey: .playerResults)
         legs = (try? c.decode([LegRecord].self, forKey: .legs)) ?? []
     }

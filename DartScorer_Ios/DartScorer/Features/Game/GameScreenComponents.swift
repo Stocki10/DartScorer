@@ -132,16 +132,30 @@ struct CricketBoardSection: View {
 
 struct GameControlBar: View {
     let sessionRole: SessionRole
+    let connectedPlayerCount: Int
     let isLegInProgress: Bool
     let canUndo: Bool
     let canUndoLocally: Bool
     let onNewGame: () -> Void
     let onRestartLeg: () -> Void
     let onShowDisconnectAlert: () -> Void
+    let onShowTournaments: () -> Void
     let onShowProfiles: () -> Void
     let onShowHistory: () -> Void
     let onShowSettings: () -> Void
     let onUndo: () -> Void
+
+    private var isMultiplayerActive: Bool {
+        sessionRole != .none
+    }
+
+    private var multiplayerLabel: String {
+        connectedPlayerCount <= 1 ? "Connecting" : "\(connectedPlayerCount) Players"
+    }
+
+    private var multiplayerTint: Color {
+        sessionRole == .joiner ? .orange : .green
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -159,40 +173,43 @@ struct GameControlBar: View {
 
             Spacer(minLength: 0)
 
-            if sessionRole == .host {
+            if isMultiplayerActive {
                 Button(action: onShowDisconnectAlert) {
-                    Image(systemName: "wifi.slash")
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(multiplayerTint)
+                            .frame(width: 8, height: 8)
+                        Text(multiplayerLabel)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                    }
                 }
                 .buttonStyle(.bordered)
-                .tint(.red)
-            } else if sessionRole == .joiner {
-                Button(action: onShowDisconnectAlert) {
-                    Image(systemName: "person.fill.xmark")
-                }
-                .buttonStyle(.bordered)
-                .tint(.orange)
+                .tint(multiplayerTint)
             }
-
-            Button(action: onShowProfiles) {
-                Image(systemName: "person.crop.circle")
-            }
-            .buttonStyle(.bordered)
-
-            Button(action: onShowHistory) {
-                Image(systemName: "clock")
-            }
-            .buttonStyle(.bordered)
-
-            Button(action: onShowSettings) {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.bordered)
 
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
             }
             .buttonStyle(.bordered)
             .disabled(!canUndo || (sessionRole != .none && !canUndoLocally))
+
+            Menu {
+                Button("Profiles", action: onShowProfiles)
+                Button("History", action: onShowHistory)
+                Button("Tournaments", action: onShowTournaments)
+                    .disabled(sessionRole != .none)
+                Button("Settings", action: onShowSettings)
+
+                if isMultiplayerActive {
+                    Divider()
+                    Button(sessionRole == .host ? "Stop Multiplayer" : "Leave Session", role: .destructive, action: onShowDisconnectAlert)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .compositingGroup()
+            .buttonStyle(.bordered)
         }
     }
 }

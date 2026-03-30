@@ -103,7 +103,7 @@ enum FinishRule: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum StartScoreOption: Int, CaseIterable, Identifiable {
+enum StartScoreOption: Int, CaseIterable, Identifiable, Codable {
     case score101 = 101
     case score301 = 301
     case score501 = 501
@@ -641,7 +641,11 @@ final class DartsGame: ObservableObject {
         legsWonByPlayerID[player.id] ?? 0
     }
 
-    func buildGameRecord() -> GameRecord {
+    func buildGameRecord(
+        id: UUID = UUID(),
+        date: Date = Date(),
+        tournamentContext: GameRecordTournamentContext? = nil
+    ) -> GameRecord {
         let results = players.map { player in
             let legResults = completedLegs.compactMap { leg in
                 leg.playerResults.first { $0.playerID == player.id }
@@ -704,11 +708,12 @@ final class DartsGame: ObservableObject {
             )
         }
         return GameRecord(
-            id: UUID(),
-            date: Date(),
+            id: id,
+            date: date,
             startingScore: startingScore,
             finishRule: gameMode == .x01 ? finishRule.rawValue : gameMode.rawValue,
             practiceMode: gameMode == .practice ? practiceMode.rawValue : nil,
+            tournamentContext: tournamentContext,
             playerResults: results,
             legs: completedLegs
         )
