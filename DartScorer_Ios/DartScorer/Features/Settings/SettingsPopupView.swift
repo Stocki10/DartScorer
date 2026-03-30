@@ -7,11 +7,12 @@ struct SettingsPopupView: View {
     let onSave: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isVisible = false
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.30)
+            Color.black.opacity(backdropOpacity)
                 .ignoresSafeArea()
                 .onTapGesture {
                     dismiss()
@@ -89,12 +90,17 @@ struct SettingsPopupView: View {
                 .padding(.vertical, 16)
             }
             .frame(maxWidth: 420)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: .black.opacity(0.18), radius: 20, x: 0, y: 8)
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color(.separator).opacity(colorScheme == .dark ? 0.28 : 0.14), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.14 : 0.08), radius: 10, x: 0, y: 4)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.06 : 0.03), radius: 2, x: 0, y: 1)
             .padding(.horizontal, 24)
-            .scaleEffect(isVisible ? 1.0 : 0.94)
+            .offset(y: isVisible ? 0 : 14)
             .opacity(isVisible ? 1.0 : 0.0)
-            .transition(.scale.combined(with: .opacity))
+            .transition(.opacity)
             .animation(.easeOut(duration: 0.22), value: isVisible)
         }
         .onAppear {
@@ -103,6 +109,10 @@ struct SettingsPopupView: View {
         .onDisappear {
             isVisible = false
         }
+    }
+
+    private var backdropOpacity: Double {
+        colorScheme == .dark ? 0.24 : 0.18
     }
 }
 
