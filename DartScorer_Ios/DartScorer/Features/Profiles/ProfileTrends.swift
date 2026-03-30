@@ -63,27 +63,36 @@ enum GameDateFilter: String, CaseIterable, Identifiable {
 struct GameRecordFilter: Equatable {
     var mode: GameModeHistoryFilter = .all
     var date: GameDateFilter = .allTime
+    var participantProfileID: UUID?
     var customStartDate: Date = Calendar.current.date(byAdding: .day, value: -29, to: Date()) ?? Date()
     var customEndDate: Date = Date()
 
     nonisolated init(
         mode: GameModeHistoryFilter = .all,
         date: GameDateFilter = .allTime,
+        participantProfileID: UUID? = nil,
         customStartDate: Date = Calendar.current.date(byAdding: .day, value: -29, to: Date()) ?? Date(),
         customEndDate: Date = Date()
     ) {
         self.mode = mode
         self.date = date
+        self.participantProfileID = participantProfileID
         self.customStartDate = customStartDate
         self.customEndDate = customEndDate
     }
 
     nonisolated var isUnfiltered: Bool {
-        mode == .all && date == .allTime
+        mode == .all && date == .allTime && participantProfileID == nil
+    }
+
+    nonisolated var hasSupplementaryFilters: Bool {
+        date != .allTime || participantProfileID != nil
     }
 
     nonisolated func includes(_ record: GameRecord, now: Date = Date(), calendar: Calendar = .current) -> Bool {
-        mode.includes(record) && dateIncludes(record.date, now: now, calendar: calendar)
+        mode.includes(record)
+            && dateIncludes(record.date, now: now, calendar: calendar)
+            && participantIncludes(record)
     }
 
     nonisolated func filteredRecords(from records: [GameRecord], now: Date = Date(), calendar: Calendar = .current) -> [GameRecord] {
@@ -112,6 +121,11 @@ struct GameRecordFilter: Equatable {
         let start = calendar.date(byAdding: .day, value: -startOffsetDays, to: todayStart) ?? todayStart
         let end = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? now
         return dateToCheck >= start && dateToCheck < end
+    }
+
+    nonisolated private func participantIncludes(_ record: GameRecord) -> Bool {
+        guard let participantProfileID else { return true }
+        return record.playerResults.contains { $0.profileID == participantProfileID }
     }
 }
 

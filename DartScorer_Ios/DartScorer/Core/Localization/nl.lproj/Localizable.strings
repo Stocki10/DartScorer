@@ -98,6 +98,7 @@
 "No Profile" = "Geen profiel";
 "No Profiles" = "Geen profielen";
 "No Score" = "Geen score";
+"No data" = "Geen gegevens";
 "No finish available" = "Geen finish beschikbaar";
 "No throw" = "Geen worp";
 "180 Count" = "180s";
@@ -218,6 +219,16 @@
 "30d" = "30d";
 "90d" = "90d";
 "Custom" = "Aangepast";
+"Filters" = "Filters";
+"Game Type" = "Wedstrijdtype";
+"Time Range" = "Periode";
+"Player" = "Speler";
+"All Players" = "Alle spelers";
+"Apply" = "Toepassen";
+"Reset" = "Resetten";
+"7 days" = "7 dagen";
+"30 days" = "30 dagen";
+"90 days" = "90 dagen";
 "Match" = "Wedstrijd";
 "Mode Filter" = "Modusfilter";
 "Trend Filter" = "Trendfilter";

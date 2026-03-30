@@ -97,6 +97,7 @@
 "No Profile" = "No Profile";
 "No Profiles" = "No Profiles";
 "No Score" = "No Score";
+"No data" = "No data";
 "No finish available" = "No finish available";
 "No throw" = "No throw";
 "180 Count" = "180 Count";
@@ -218,6 +219,16 @@
 "90d" = "90d";
 "Custom" = "Custom";
 "Match" = "Match";
+"Filters" = "Filters";
+"Game Type" = "Game Type";
+"Time Range" = "Time Range";
+"Player" = "Player";
+"All Players" = "All Players";
+"Apply" = "Apply";
+"Reset" = "Reset";
+"7 days" = "7 days";
+"30 days" = "30 days";
+"90 days" = "90 days";
 "Mode Filter" = "Mode Filter";
 "Trend Filter" = "Trend Filter";
 "Stats Scope" = "Stats Scope";

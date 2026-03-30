@@ -97,6 +97,7 @@
 "No Profile" = "Kein Profil";
 "No Profiles" = "Keine Profile";
 "No Score" = "No Score";
+"No data" = "Keine Daten";
 "No finish available" = "Kein Finish verfügbar";
 "No throw" = "Kein Wurf";
 "180 Count" = "180er";
@@ -218,6 +219,16 @@
 "90d" = "90d";
 "Custom" = "Benutzerdefiniert";
 "Match" = "Match";
+"Filters" = "Filter";
+"Game Type" = "Spieltyp";
+"Time Range" = "Zeitraum";
+"Player" = "Spieler";
+"All Players" = "Alle Spieler";
+"Apply" = "Anwenden";
+"Reset" = "Zurücksetzen";
+"7 days" = "7 Tage";
+"30 days" = "30 Tage";
+"90 days" = "90 Tage";
 "Mode Filter" = "Modusfilter";
 "Trend Filter" = "Trendfilter";
 "Stats Scope" = "Statistikbereich";
