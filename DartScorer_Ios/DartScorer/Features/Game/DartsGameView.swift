@@ -41,8 +41,8 @@ struct DartsGameView: View {
     @State private var isShowingHistory = false
     @State private var isShowingProfiles = false
     @State private var hasPersistedCompletedGame = false
-    @State private var shareItems: [Any] = []
-    @State private var isShowingShareSheet = false
+    @State private var sharePayload: ShareSheetPayload?
+    @State private var isPreparingShare = false
     @StateObject private var historyStore = GameHistoryStore()
     @ObservedObject var profileStore: PlayerProfileStore
     @State private var draftThemeMode: AppThemeMode = .light
@@ -221,6 +221,7 @@ struct DartsGameView: View {
                     title: winnerTitle,
                     subtitle: winningSubtitle,
                     summary: currentMatchShareSummary,
+                    isPreparingShare: isPreparingShare,
                     showNewLeg: game.setWinner == nil,
                     canUndo: game.canUndo,
                     canUndoLocally: !session.isActive || session.canUndoLocally,
@@ -278,8 +279,8 @@ struct DartsGameView: View {
         .sheet(isPresented: $isShowingProfiles) {
             PlayerProfileView(store: profileStore, historyStore: historyStore)
         }
-        .sheet(isPresented: $isShowingShareSheet) {
-            ShareSheet(items: shareItems)
+        .sheet(item: $sharePayload) { payload in
+            ShareSheet(items: payload.items)
         }
         .onChange(of: session.gameHasStarted) { _, started in
             guard started && session.role == .joiner else { return }
@@ -556,11 +557,18 @@ struct DartsGameView: View {
     }
 
     private func shareCurrentMatchSummary() {
+        guard !isPreparingShare else { return }
         persistCompletedGameIfNeeded()
         let record = game.buildGameRecord()
         let summary = winnerShareSummary(for: record)
-        shareItems = MatchShareRenderer.shareItems(for: summary)
-        isShowingShareSheet = true
+        isPreparingShare = true
+
+        Task { @MainActor in
+            await Task.yield()
+            let items = MatchShareRenderer.shareItems(for: summary)
+            sharePayload = ShareSheetPayload(items: items)
+            isPreparingShare = false
+        }
     }
 
     private func winnerShareSummary(for record: GameRecord) -> MatchShareSummary {

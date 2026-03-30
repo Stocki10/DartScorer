@@ -1,6 +1,11 @@
 import SwiftUI
 import UIKit
 
+struct ShareSheetPayload: Identifiable {
+    let id = UUID()
+    let items: [Any]
+}
+
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 

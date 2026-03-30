@@ -162,8 +162,8 @@ struct GameRecordDetailView: View {
     let record: GameRecord
     let showsToolbarBackButton: Bool
     @Environment(\.dismiss) private var dismiss
-    @State private var shareItems: [Any] = []
-    @State private var isShowingShareSheet = false
+    @State private var sharePayload: ShareSheetPayload?
+    @State private var isPreparingShare = false
 
     init(record: GameRecord, showsToolbarBackButton: Bool = true) {
         self.record = record
@@ -199,36 +199,24 @@ struct GameRecordDetailView: View {
             List {
                 Section("Match Summary") {
                     VStack(alignment: .leading, spacing: 14) {
-                        HStack(alignment: .top, spacing: 16) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(formatLabel)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(formatLabel)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
 
-                                if let winner {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "trophy.fill")
-                                            .foregroundStyle(.yellow)
-                                        Text(winner.name)
-                                            .font(.title2.weight(.bold))
-                                            .foregroundStyle(.primary)
-                                    }
-                                } else {
-                                    Text(L10n.string("No data"))
-                                        .font(.title3.weight(.semibold))
-                                        .foregroundStyle(.secondary)
+                            if let winner {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "trophy.fill")
+                                        .foregroundStyle(.yellow)
+                                    Text(winner.name)
+                                        .font(.title2.weight(.bold))
+                                        .foregroundStyle(.primary)
                                 }
+                            } else {
+                                Text(L10n.string("No data"))
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(.secondary)
                             }
-
-                            Spacer()
-
-                            Button {
-                                shareItems = MatchShareRenderer.shareItems(for: record)
-                                isShowingShareSheet = true
-                            } label: {
-                                Label(L10n.string("Share"), systemImage: "square.and.arrow.up")
-                            }
-                            .buttonStyle(.bordered)
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
@@ -308,10 +296,31 @@ struct GameRecordDetailView: View {
                         ToolbarBackButton { dismiss() }
                     }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        guard !isPreparingShare else { return }
+                        isPreparingShare = true
+                        Task { @MainActor in
+                            await Task.yield()
+                            let items = MatchShareRenderer.shareItems(for: record)
+                            sharePayload = ShareSheetPayload(items: items)
+                            isPreparingShare = false
+                        }
+                    } label: {
+                        if isPreparingShare {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                    .disabled(isPreparingShare)
+                    .accessibilityLabel(L10n.string("Share"))
+                }
             }
         }
-        .sheet(isPresented: $isShowingShareSheet) {
-            ShareSheet(items: shareItems)
+        .sheet(item: $sharePayload) { payload in
+            ShareSheet(items: payload.items)
         }
     }
 }
