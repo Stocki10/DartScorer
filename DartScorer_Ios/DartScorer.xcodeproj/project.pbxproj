@@ -33,7 +33,7 @@
 		7CC2CBEB2F44C96400036F50 /* Exceptions for "DartScorer" folder in "DartScorer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				App/Info.plist,
 			);
 			target = 7CC2CBC72F44C96300036F50 /* DartScorer */;
 		};
@@ -289,14 +289,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = DartScorer/DartScorerDebug.entitlements;
+				CODE_SIGN_ENTITLEMENTS = DartScorer/App/DartScorerDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9N7CPJQ9XU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DartScorer/Info.plist;
+				INFOPLIST_FILE = DartScorer/App/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan the host's QR code when joining a multiplayer game.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DartScorer uses the local network to connect with other players on the same Wi-Fi for multiplayer games.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -327,13 +327,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = DartScorer/DartScorer.entitlements;
+				CODE_SIGN_ENTITLEMENTS = DartScorer/App/DartScorer.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 9N7CPJQ9XU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DartScorer/Info.plist;
+				INFOPLIST_FILE = DartScorer/App/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan the host's QR code when joining a multiplayer game.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "DartScorer uses the local network to connect with other players on the same Wi-Fi for multiplayer games.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
