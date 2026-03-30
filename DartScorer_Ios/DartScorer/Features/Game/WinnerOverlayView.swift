@@ -5,6 +5,7 @@ struct WinnerOverlayView: View {
     let title: String
     let subtitle: String
     let summary: MatchShareSummary?
+    let isPreparingShare: Bool
     let showNewLeg: Bool
     let canUndo: Bool
     let canUndoLocally: Bool
@@ -57,10 +58,16 @@ struct WinnerOverlayView: View {
 
                 if let onShareSummary {
                     Button(action: onShareSummary) {
-                        Image(systemName: "square.and.arrow.up")
+                        if isPreparingShare {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                        }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    .disabled(isPreparingShare)
                     .accessibilityLabel(L10n.string("Share Summary"))
                 }
 
