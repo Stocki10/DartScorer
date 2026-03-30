@@ -121,6 +121,7 @@ enum MultiplayerMessage: Codable {
     case playerAssignment(PlayerAssignmentPayload)
     case profileSync([PlayerProfile])
     case statsUpdate([PlayerProfile])
+    case hostPreparingNewGame(Bool)
     case turnLock(TurnLockPayload)
     case turnUnlock
     case gameStarted
@@ -129,7 +130,7 @@ enum MultiplayerMessage: Codable {
 
     private enum Tag: String, Codable {
         case scoreUpdate, quickScoreUpdate, undoRequest, gameState, sessionConfig
-        case playerAssignment, profileSync, statsUpdate, turnLock, turnUnlock, gameStarted
+        case playerAssignment, profileSync, statsUpdate, hostPreparingNewGame, turnLock, turnUnlock, gameStarted
     }
 
     func encode(to encoder: Encoder) throws {
@@ -151,6 +152,8 @@ enum MultiplayerMessage: Codable {
             try c.encode(Tag.profileSync, forKey: .type); try c.encode(ps, forKey: .payload)
         case .statsUpdate(let ps):
             try c.encode(Tag.statsUpdate, forKey: .type); try c.encode(ps, forKey: .payload)
+        case .hostPreparingNewGame(let preparing):
+            try c.encode(Tag.hostPreparingNewGame, forKey: .type); try c.encode(preparing, forKey: .payload)
         case .turnLock(let p):
             try c.encode(Tag.turnLock, forKey: .type); try c.encode(p, forKey: .payload)
         case .turnUnlock:
@@ -171,6 +174,7 @@ enum MultiplayerMessage: Codable {
         case .playerAssignment: self = .playerAssignment(try c.decode(PlayerAssignmentPayload.self, forKey: .payload))
         case .profileSync:      self = .profileSync(try c.decode([PlayerProfile].self, forKey: .payload))
         case .statsUpdate:      self = .statsUpdate(try c.decode([PlayerProfile].self, forKey: .payload))
+        case .hostPreparingNewGame: self = .hostPreparingNewGame(try c.decode(Bool.self, forKey: .payload))
         case .turnLock:         self = .turnLock(try c.decode(TurnLockPayload.self, forKey: .payload))
         case .turnUnlock:       self = .turnUnlock
         case .gameStarted:      self = .gameStarted

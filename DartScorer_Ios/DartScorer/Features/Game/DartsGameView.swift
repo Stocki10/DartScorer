@@ -244,6 +244,11 @@ struct DartsGameView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            if session.role == .joiner && session.hostIsPreparingNewGame {
+                HostPreparingNewGameBannerView()
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(isPresented: $isShowingNewGameSetup) {
@@ -281,6 +286,10 @@ struct DartsGameView: View {
         }
         .sheet(item: $sharePayload) { payload in
             ShareSheet(items: payload.items)
+        }
+        .onChange(of: isShowingNewGameSetup) { _, isShowing in
+            guard session.role == .host, session.isActive else { return }
+            session.setHostPreparingNewGame(isShowing)
         }
         .onChange(of: session.gameHasStarted) { _, started in
             guard started && session.role == .joiner else { return }

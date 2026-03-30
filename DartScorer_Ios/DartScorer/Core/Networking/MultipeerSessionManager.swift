@@ -17,6 +17,7 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
     @Published private(set) var isReconnecting = false
     @Published private(set) var sessionToken = ""       // "DART-XXXX" for display
     @Published private(set) var gameHasStarted = false
+    @Published private(set) var hostIsPreparingNewGame = false
     @Published private(set) var playerAssignments: [String: [String]] = [:]   // deviceID -> [playerID strings]
     @Published private(set) var peerDisplayNames: [String: String] = [:]      // deviceID -> display name
     @Published private(set) var lastDisconnectedPeerName: String? = nil
@@ -35,7 +36,6 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
     private var expectedToken: String?                  // joiner uses this to validate host
     private var expectedHostName: String?               // joiner uses this to find the right peer
     private var cachedGameState: NetworkGameState?      // for reconnect re-send (host only)
-    private var lockDeviceID: String?                   // free-mode first-write lock
     private var currentTurnSequence = 0                 // monotonically increasing per turn
     private var peerDeviceIDs: [MCPeerID: String] = [:]       // MCPeerID -> deviceID
 
@@ -53,10 +53,10 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
     func hostSession(inputMode: InputMode, undoPermission: UndoPermission) {
         self.inputMode = inputMode
         self.undoPermission = undoPermission
-        lockDeviceID = nil
         currentTurnSequence = 0
         playerAssignments = [:]
         peerDeviceIDs = [:]
+        hostIsPreparingNewGame = false
 
         let suffix = String(format: "%04X", Int.random(in: 0..<65536))
         sessionToken = "DART-\(suffix)"
@@ -175,6 +175,13 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
         broadcastSessionConfig()
     }
 
+    func setHostPreparingNewGame(_ preparing: Bool) {
+        guard role == .host else { return }
+        guard hostIsPreparingNewGame != preparing else { return }
+        hostIsPreparingNewGame = preparing
+        broadcastMessage(.hostPreparingNewGame(preparing))
+    }
+
     func setPlayerAssignment(playerID: UUID, toDeviceID: String) {
         guard role == .host else { return }
         let pidStr = playerID.uuidString
@@ -196,16 +203,18 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
         advertiser = nil; browser = nil; mcSession = nil
         role = .none
         connectedPeers = []
-        lockDeviceID = nil
         currentTurnSequence = 0
         isReconnecting = false
         cachedGameState = nil
+        hostIsPreparingNewGame = false
         playerAssignments = [:]
         peerDeviceIDs = [:]
         peerDisplayNames = [:]
         lastDisconnectedPeerName = nil
         sessionToken = ""
         gameHasStarted = false
+        expectedToken = nil
+        expectedHostName = nil
     }
 
     // MARK: - Post-Game
@@ -246,7 +255,6 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
             guard !assignedPlayerIDs.isEmpty else { return false }
             return isMyPlayer
         case .free:
-            if let holder = lockDeviceID { return holder != deviceID }
             return false
         }
     }
@@ -264,8 +272,7 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
     private func broadcastAfterHostMutation(turnEnded: Bool) {
         guard let snapshot = game?.buildNetworkSnapshot() else { return }
         cachedGameState = snapshot
-        if turnEnded && inputMode == .free {
-            lockDeviceID = nil
+        if turnEnded {
             currentTurnSequence += 1
             broadcastMessage(.turnUnlock)
         }
@@ -312,11 +319,7 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
             case .ownOnly:    guard peerPlayers.contains(activeID) else { return }
             case .othersOnly: guard !peerPlayers.contains(activeID) else { return }
             case .free:
-                if let holder = lockDeviceID, holder != peerDID { return }
-                if lockDeviceID == nil {
-                    lockDeviceID = peerDID
-                    broadcastMessage(.turnLock(TurnLockPayload(deviceID: peerDID, turnSequence: currentTurnSequence)))
-                }
+                break
             }
             let prevIdx = game.activePlayerIndex
             game.submitThrow(segment: payload.segment, multiplier: payload.multiplier)
@@ -333,11 +336,7 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
             case .ownOnly:    guard peerPlayers.contains(activeID) else { return }
             case .othersOnly: guard !peerPlayers.contains(activeID) else { return }
             case .free:
-                if let holder = lockDeviceID, holder != peerDID { return }
-                if lockDeviceID == nil {
-                    lockDeviceID = peerDID
-                    broadcastMessage(.turnLock(TurnLockPayload(deviceID: peerDID, turnSequence: currentTurnSequence)))
-                }
+                break
             }
             let prevIdx = game.activePlayerIndex
             game.submitQuickScore(payload.score)
@@ -388,14 +387,17 @@ final class MultipeerSessionManager: NSObject, ObservableObject {
                 store.replaceAll(ProfileMerger().merge(local: store.profiles, incoming: profiles))
             }
 
-        case .turnLock(let payload):
+        case .hostPreparingNewGame(let preparing):
             guard role == .joiner else { return }
-            guard payload.turnSequence == currentTurnSequence else { return }
-            DispatchQueue.main.async { [weak self] in self?.lockDeviceID = payload.deviceID }
+            DispatchQueue.main.async { [weak self] in
+                self?.hostIsPreparingNewGame = preparing
+            }
+
+        case .turnLock:
+            break
 
         case .turnUnlock:
             DispatchQueue.main.async { [weak self] in
-                self?.lockDeviceID = nil
                 self?.currentTurnSequence += 1
             }
 
@@ -419,6 +421,9 @@ extension MultipeerSessionManager: MCSessionDelegate {
                 if self.role == .host {
                     // Send session config + current game state to newly connected peer
                     self.broadcastSessionConfig()
+                    if self.hostIsPreparingNewGame {
+                        self.send(.hostPreparingNewGame(true), to: [peer])
+                    }
                     if let snapshot = self.cachedGameState ?? self.game?.buildNetworkSnapshot() {
                         self.send(.gameState(snapshot), to: [peer])
                     }
@@ -429,7 +434,11 @@ extension MultipeerSessionManager: MCSessionDelegate {
                 }
             case .notConnected:
                 self.connectedPeers.removeAll { $0 == peer }
-                if self.role == .host && self.connectedPeers.isEmpty && self.gameHasStarted {
+                guard self.gameHasStarted else {
+                    self.isReconnecting = false
+                    return
+                }
+                if self.role == .host && self.connectedPeers.isEmpty {
                     // All guests left — end the session but keep the peer name for the alert
                     let leavingName = peer.displayName
                     self.endSession()
