@@ -178,7 +178,7 @@ struct DartsGameView: View {
                 ? "Finish Tournament"
                 : "Next Match"
         }
-        return hasUpcomingTournamentMatch ? "Next Match" : "Finish Tournament"
+        return "Back to Tournament"
     }
 
     private var hasUpcomingTournamentMatch: Bool {
@@ -216,7 +216,11 @@ struct DartsGameView: View {
     }
 
     private var winnerOverlaySecondaryTitle: String? {
-        guard session.role != .joiner, activeTournamentMatchContext != nil else { return nil }
+        guard session.role != .joiner,
+              let activeTournamentMatchContext,
+              activeTournamentMatchContext.tournamentFormat == .singleElimination else {
+            return nil
+        }
         return "View Tournament"
     }
 
@@ -757,6 +761,12 @@ struct DartsGameView: View {
     private func advanceTournamentFlow() {
         guard let activeTournamentMatchContext else { return }
         _ = persistCompletedGameIfNeeded()
+
+        if activeTournamentMatchContext.tournamentFormat == .roundRobin {
+            clearActiveTournamentMatchIfNeeded(resetUnfinished: false)
+            presentTournamentDetail(activeTournamentMatchContext.tournamentID)
+            return
+        }
 
         if let nextContext = tournamentStore.nextReadyMatchContext(
             tournamentID: activeTournamentMatchContext.tournamentID,

@@ -17,6 +17,22 @@ enum TournamentFormat: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+enum TournamentRoundRobinMode: String, CaseIterable, Identifiable, Codable {
+    case single
+    case double
+
+    nonisolated var id: String { rawValue }
+
+    nonisolated var label: String {
+        switch self {
+        case .single:
+            return "Single Round Robin"
+        case .double:
+            return "Double Round Robin"
+        }
+    }
+}
+
 enum TournamentStatus: String, Codable {
     case draft
     case inProgress
@@ -152,6 +168,7 @@ struct Tournament: Identifiable, Codable, Equatable {
     let createdAt: Date
     var completedAt: Date?
     let format: TournamentFormat
+    let roundRobinMode: TournamentRoundRobinMode
     var status: TournamentStatus
     let participants: [TournamentParticipant]
     let rules: TournamentMatchRules
@@ -165,6 +182,7 @@ struct Tournament: Identifiable, Codable, Equatable {
         createdAt: Date = Date(),
         completedAt: Date? = nil,
         format: TournamentFormat,
+        roundRobinMode: TournamentRoundRobinMode = .single,
         status: TournamentStatus = .draft,
         participants: [TournamentParticipant],
         rules: TournamentMatchRules,
@@ -177,12 +195,60 @@ struct Tournament: Identifiable, Codable, Equatable {
         self.createdAt = createdAt
         self.completedAt = completedAt
         self.format = format
+        self.roundRobinMode = roundRobinMode
         self.status = status
         self.participants = participants
         self.rules = rules
         self.rounds = rounds
         self.matches = matches
         self.winnerParticipantID = winnerParticipantID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case createdAt
+        case completedAt
+        case format
+        case roundRobinMode
+        case status
+        case participants
+        case rules
+        case rounds
+        case matches
+        case winnerParticipantID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+        format = try container.decode(TournamentFormat.self, forKey: .format)
+        roundRobinMode = try container.decodeIfPresent(TournamentRoundRobinMode.self, forKey: .roundRobinMode) ?? .single
+        status = try container.decode(TournamentStatus.self, forKey: .status)
+        participants = try container.decode([TournamentParticipant].self, forKey: .participants)
+        rules = try container.decode(TournamentMatchRules.self, forKey: .rules)
+        rounds = try container.decode([TournamentRound].self, forKey: .rounds)
+        matches = try container.decode([TournamentMatch].self, forKey: .matches)
+        winnerParticipantID = try container.decodeIfPresent(UUID.self, forKey: .winnerParticipantID)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(completedAt, forKey: .completedAt)
+        try container.encode(format, forKey: .format)
+        try container.encode(roundRobinMode, forKey: .roundRobinMode)
+        try container.encode(status, forKey: .status)
+        try container.encode(participants, forKey: .participants)
+        try container.encode(rules, forKey: .rules)
+        try container.encode(rounds, forKey: .rounds)
+        try container.encode(matches, forKey: .matches)
+        try container.encodeIfPresent(winnerParticipantID, forKey: .winnerParticipantID)
     }
 }
 
@@ -217,7 +283,8 @@ final class TournamentStore: ObservableObject {
         name: String,
         format: TournamentFormat,
         participants: [TournamentParticipant],
-        rules: TournamentMatchRules
+        rules: TournamentMatchRules,
+        roundRobinMode: TournamentRoundRobinMode = .single
     ) -> Tournament {
         let normalizedParticipants = participants.enumerated().map { index, participant in
             TournamentParticipant(
@@ -232,7 +299,8 @@ final class TournamentStore: ObservableObject {
             name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Tournament" : name.trimmingCharacters(in: .whitespacesAndNewlines),
             format: format,
             participants: normalizedParticipants,
-            rules: rules
+            rules: rules,
+            roundRobinMode: roundRobinMode
         )
         tournaments.insert(tournament, at: 0)
         save()
@@ -429,7 +497,8 @@ final class TournamentStore: ObservableObject {
         name: String,
         format: TournamentFormat,
         participants: [TournamentParticipant],
-        rules: TournamentMatchRules
+        rules: TournamentMatchRules,
+        roundRobinMode: TournamentRoundRobinMode
     ) -> Tournament {
         let tournamentID = UUID()
         switch format {
@@ -439,6 +508,7 @@ final class TournamentStore: ObservableObject {
                 id: tournamentID,
                 name: name,
                 format: format,
+                roundRobinMode: roundRobinMode,
                 status: .inProgress,
                 participants: participants,
                 rules: rules,
@@ -448,11 +518,16 @@ final class TournamentStore: ObservableObject {
             advanceSingleElimination(&tournament)
             return tournament
         case .roundRobin:
-            let matches = makeRoundRobinMatches(tournamentID: tournamentID, participants: participants)
+            let matches = makeRoundRobinMatches(
+                tournamentID: tournamentID,
+                participants: participants,
+                mode: roundRobinMode
+            )
             return Tournament(
                 id: tournamentID,
                 name: name,
                 format: format,
+                roundRobinMode: roundRobinMode,
                 status: .inProgress,
                 participants: participants,
                 rules: rules,
@@ -464,23 +539,28 @@ final class TournamentStore: ObservableObject {
 
     private static func makeRoundRobinMatches(
         tournamentID: UUID,
-        participants: [TournamentParticipant]
+        participants: [TournamentParticipant],
+        mode: TournamentRoundRobinMode
     ) -> [TournamentMatch] {
         var matches: [TournamentMatch] = []
         var slotIndex = 0
-        for firstIndex in participants.indices {
-            for secondIndex in participants.indices where secondIndex > firstIndex {
-                matches.append(
-                    TournamentMatch(
-                        tournamentID: tournamentID,
-                        roundIndex: 0,
-                        slotIndex: slotIndex,
-                        playerAParticipantID: participants[firstIndex].id,
-                        playerBParticipantID: participants[secondIndex].id,
-                        status: .ready
+        let cycleCount = mode == .double ? 2 : 1
+
+        for cycleIndex in 0..<cycleCount {
+            for firstIndex in participants.indices {
+                for secondIndex in participants.indices where secondIndex > firstIndex {
+                    matches.append(
+                        TournamentMatch(
+                            tournamentID: tournamentID,
+                            roundIndex: cycleIndex,
+                            slotIndex: slotIndex,
+                            playerAParticipantID: participants[firstIndex].id,
+                            playerBParticipantID: participants[secondIndex].id,
+                            status: .ready
+                        )
                     )
-                )
-                slotIndex += 1
+                    slotIndex += 1
+                }
             }
         }
         return matches

@@ -2054,7 +2054,7 @@ struct DartScorerTests {
         })
         #expect(pairings.count == 3)
 
-        for match in tournament.matches {
+        for match in tournament.matches.reversed() {
             guard let playerAID = match.playerAParticipantID,
                   let playerBID = match.playerBParticipantID,
                   let playerA = participants.first(where: { $0.id == playerAID }),
@@ -2081,5 +2081,61 @@ struct DartScorerTests {
         #expect(updated.status == .completed)
         #expect(standings.first?.participant.name == "Alex")
         #expect(standings.first?.wins == 2)
+    }
+
+    @Test func doubleRoundRobinGeneratesEveryPairingTwice() {
+        let store = TournamentStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Alex"),
+            tournamentParticipant(seed: 2, name: "Blake"),
+            tournamentParticipant(seed: 3, name: "Casey")
+        ]
+
+        let tournament = store.createTournament(
+            name: "Home and Away",
+            format: .roundRobin,
+            participants: participants,
+            rules: TournamentMatchRules(),
+            roundRobinMode: .double
+        )
+
+        #expect(tournament.roundRobinMode == .double)
+        #expect(tournament.matches.count == 6)
+
+        let pairingCounts = tournament.matches.reduce(into: [Set<UUID>: Int]()) { counts, match in
+            guard let playerA = match.playerAParticipantID,
+                  let playerB = match.playerBParticipantID else { return }
+            counts[Set([playerA, playerB]), default: 0] += 1
+        }
+
+        #expect(pairingCounts.count == 3)
+        #expect(pairingCounts.values.allSatisfy { $0 == 2 })
+        #expect(tournament.matches.allSatisfy { $0.status == .ready })
+    }
+
+    @Test func tournamentDecodingDefaultsMissingRoundRobinModeToSingle() throws {
+        let participants = [
+            tournamentParticipant(seed: 1, name: "Alex"),
+            tournamentParticipant(seed: 2, name: "Blake")
+        ]
+
+        let tournament = Tournament(
+            name: "Legacy League",
+            format: .roundRobin,
+            roundRobinMode: .double,
+            status: .inProgress,
+            participants: participants,
+            rules: TournamentMatchRules(),
+            rounds: [],
+            matches: []
+        )
+
+        let encoded = try JSONEncoder().encode(tournament)
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "roundRobinMode")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(Tournament.self, from: legacyData)
+
+        #expect(decoded.roundRobinMode == .single)
     }
 }
