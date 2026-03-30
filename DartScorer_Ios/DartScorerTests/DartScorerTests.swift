@@ -58,6 +58,107 @@ struct DartScorerTests {
         )
     }
 
+    private func trendRecord(
+        profileID: UUID,
+        date: Date,
+        isWinner: Bool,
+        average: Double,
+        firstNineAverage: Double?,
+        checkoutAttempts: Int,
+        checkoutHits: Int,
+        score180Count: Int = 0,
+        score140PlusCount: Int = 0,
+        totalDartsThrown: Int,
+        totalPointsScored: Int,
+        totalFirstNinePoints: Int,
+        totalFirstNineDarts: Int,
+        practiceMode: PracticeMode? = nil,
+        finishRule: String = FinishRule.doubleOut.rawValue
+    ) -> GameRecord {
+        GameRecord(
+            id: UUID(),
+            date: date,
+            startingScore: practiceMode == nil ? 501 : 0,
+            finishRule: practiceMode == nil ? finishRule : GameMode.practice.rawValue,
+            practiceMode: practiceMode?.rawValue,
+            playerResults: [
+                PlayerGameResult(
+                    id: UUID(),
+                    name: "Alex",
+                    average: average,
+                    firstNineAverage: firstNineAverage,
+                    highestTurnScore: 140,
+                    highestScore: 140,
+                    checkoutPercentage: checkoutAttempts > 0 ? Double(checkoutHits) / Double(checkoutAttempts) : nil,
+                    checkoutAttempts: checkoutAttempts,
+                    checkoutHits: checkoutHits,
+                    isWinner: isWinner,
+                    profileID: profileID,
+                    totalDartsThrown: totalDartsThrown,
+                    totalPointsScored: totalPointsScored,
+                    highestCheckout: 100,
+                    score180Count: score180Count,
+                    score140PlusCount: score140PlusCount,
+                    totalFirstNinePoints: totalFirstNinePoints,
+                    totalFirstNineDarts: totalFirstNineDarts
+                )
+            ],
+            legs: []
+        )
+    }
+
+    private func rivalryResult(
+        profileID: UUID?,
+        name: String,
+        isWinner: Bool,
+        average: Double = 60,
+        firstNineAverage: Double? = 75,
+        highestCheckout: Int = 100,
+        totalDartsThrown: Int = 15,
+        totalPointsScored: Int = 300,
+        totalFirstNinePoints: Int = 90,
+        totalFirstNineDarts: Int = 9
+    ) -> PlayerGameResult {
+        PlayerGameResult(
+            id: profileID ?? UUID(),
+            name: name,
+            average: average,
+            firstNineAverage: firstNineAverage,
+            highestTurnScore: 140,
+            highestScore: 140,
+            checkoutPercentage: nil,
+            checkoutAttempts: 0,
+            checkoutHits: 0,
+            isWinner: isWinner,
+            profileID: profileID,
+            totalDartsThrown: totalDartsThrown,
+            totalPointsScored: totalPointsScored,
+            highestCheckout: highestCheckout,
+            score180Count: 0,
+            score140PlusCount: 0,
+            totalFirstNinePoints: totalFirstNinePoints,
+            totalFirstNineDarts: totalFirstNineDarts
+        )
+    }
+
+    private func rivalryRecord(
+        date: Date,
+        playerResults: [PlayerGameResult],
+        finishRule: String = FinishRule.doubleOut.rawValue,
+        startingScore: Int = 501,
+        practiceMode: PracticeMode? = nil
+    ) -> GameRecord {
+        GameRecord(
+            id: UUID(),
+            date: date,
+            startingScore: practiceMode == nil ? startingScore : 0,
+            finishRule: practiceMode == nil ? finishRule : GameMode.practice.rawValue,
+            practiceMode: practiceMode?.rawValue,
+            playerResults: playerResults,
+            legs: []
+        )
+    }
+
     @Test func scoreSubtractionOnValidThrow() {
         let game = DartsGame(playerCount: 2)
 
@@ -1235,5 +1336,499 @@ struct DartScorerTests {
 
         #expect(game.winner?.id == game.players[0].id)
         #expect(game.players[0].score == 2)
+    }
+
+    @Test func profileTrendsUseLastFiveQualifyingRecordsForAverage() {
+        let profileID = UUID()
+        var stats = PlayerProfileStats()
+        stats.gamesPlayed = 6
+        stats.gamesWon = 3
+        stats.totalDartsThrown = 60
+        stats.totalPointsScored = 1200
+        stats.totalFirstNinePoints = 270
+        stats.totalFirstNineDarts = 18
+        stats.checkoutAttempts = 10
+        stats.checkoutHits = 4
+        stats.score180Count = 1
+        stats.score140PlusCount = 3
+        stats.highestCheckout = 100
+        stats.highestTurnScore = 140
+        stats.highestScore = 140
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 6), isWinner: true, average: 60, firstNineAverage: 70, checkoutAttempts: 2, checkoutHits: 1, totalDartsThrown: 20, totalPointsScored: 400, totalFirstNinePoints: 90, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 5), isWinner: false, average: 45, firstNineAverage: 50, checkoutAttempts: 1, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 60, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 4), isWinner: true, average: 30, firstNineAverage: 35, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 100, totalFirstNinePoints: 30, totalFirstNineDarts: 6),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: false, average: 30, firstNineAverage: 30, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 100, totalFirstNinePoints: 30, totalFirstNineDarts: 6),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 30, firstNineAverage: 40, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 100, totalFirstNinePoints: 60, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 90, firstNineAverage: 90, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 5, totalPointsScored: 150, totalFirstNinePoints: 90, totalFirstNineDarts: 3)
+        ]
+
+        let snapshot = ProfileTrends.makeSnapshot(
+            for: profileID,
+            stats: stats,
+            records: records,
+            filter: GameRecordFilter()
+        )
+
+        #expect(snapshot.sampleSize == 5)
+        #expect(snapshot.average.recentValue != nil)
+        #expect(abs((snapshot.average.recentValue ?? 0) - 42.5) < 0.001)
+    }
+
+    @Test func gameRecordFilterX01ExcludesCricketAndPractice() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: true, average: 50, firstNineAverage: 55, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 170, totalFirstNinePoints: 90, totalFirstNineDarts: 9, practiceMode: .scoringDrill),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: false, average: 60, firstNineAverage: 60, checkoutAttempts: 2, checkoutHits: 1, totalDartsThrown: 20, totalPointsScored: 400, totalFirstNinePoints: 180, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 45, firstNineAverage: 50, checkoutAttempts: 1, checkoutHits: 0, totalDartsThrown: 12, totalPointsScored: 180, totalFirstNinePoints: 90, totalFirstNineDarts: 6, finishRule: GameMode.cricket.rawValue)
+        ]
+
+        let filter = GameRecordFilter(mode: .x01)
+        let filtered = filter.filteredRecords(from: records)
+
+        #expect(filtered.count == 1)
+        #expect(filtered.allSatisfy(\.isX01Record))
+    }
+
+    @Test func gameRecordFilterCricketIncludesOnlyCricketRecords() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: true, average: 50, firstNineAverage: 55, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 170, totalFirstNinePoints: 90, totalFirstNineDarts: 9, practiceMode: .scoringDrill),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: false, average: 60, firstNineAverage: 60, checkoutAttempts: 2, checkoutHits: 1, totalDartsThrown: 20, totalPointsScored: 400, totalFirstNinePoints: 180, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 45, firstNineAverage: 50, checkoutAttempts: 1, checkoutHits: 0, totalDartsThrown: 12, totalPointsScored: 180, totalFirstNinePoints: 90, totalFirstNineDarts: 6, practiceMode: .doublesPractice)
+        ]
+
+        let cricketRecord = trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 4), isWinner: true, average: 42, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 18, totalPointsScored: 80, totalFirstNinePoints: 0, totalFirstNineDarts: 0, finishRule: GameMode.cricket.rawValue)
+        let filtered = GameRecordFilter(mode: .cricket).filteredRecords(from: records + [cricketRecord])
+
+        #expect(filtered.count == 1)
+        #expect(filtered.allSatisfy(\.isCricketRecord))
+    }
+
+    @Test func gameRecordFilterPracticeIncludesAllPracticeVariants() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: true, average: 50, firstNineAverage: 55, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 170, totalFirstNinePoints: 90, totalFirstNineDarts: 9, practiceMode: .scoringDrill),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 50, firstNineAverage: 55, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 170, totalFirstNinePoints: 90, totalFirstNineDarts: 9, practiceMode: .doublesPractice),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: false, average: 60, firstNineAverage: 60, checkoutAttempts: 2, checkoutHits: 1, totalDartsThrown: 20, totalPointsScored: 400, totalFirstNinePoints: 180, totalFirstNineDarts: 9)
+        ]
+
+        let filtered = GameRecordFilter(mode: .practice).filteredRecords(from: records)
+
+        #expect(filtered.count == 2)
+        #expect(filtered.allSatisfy(\.isPracticeRecord))
+    }
+
+    @Test func gameRecordFilterLastSevenDaysIncludesBoundary() {
+        let profileID = UUID()
+        let now = Date(timeIntervalSince1970: 10 * 24 * 60 * 60)
+        let inside = trendRecord(profileID: profileID, date: now.addingTimeInterval(-6 * 24 * 60 * 60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        let outside = trendRecord(profileID: profileID, date: now.addingTimeInterval(-7 * 24 * 60 * 60).addingTimeInterval(-60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+
+        let filtered = GameRecordFilter(date: .last7Days).filteredRecords(from: [inside, outside], now: now)
+
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.id == inside.id)
+    }
+
+    @Test func gameRecordFilterCustomRangeIncludesBothBoundaries() {
+        let profileID = UUID()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+        let end = Date(timeIntervalSince1970: 1_100_000)
+        let lowerBoundary = trendRecord(profileID: profileID, date: start, isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        let upperBoundary = trendRecord(profileID: profileID, date: end, isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        let outside = trendRecord(profileID: profileID, date: end.addingTimeInterval(24 * 60 * 60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+
+        let filter = GameRecordFilter(mode: .all, date: .custom, customStartDate: start, customEndDate: end)
+        let filtered = filter.filteredRecords(from: [lowerBoundary, upperBoundary, outside], now: end)
+
+        #expect(filtered.count == 2)
+    }
+
+    @Test func combinedModeAndDateFilterWorksTogether() {
+        let profileID = UUID()
+        let now = Date(timeIntervalSince1970: 100 * 24 * 60 * 60)
+        let recentPractice = trendRecord(profileID: profileID, date: now.addingTimeInterval(-2 * 24 * 60 * 60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0, practiceMode: .scoringDrill)
+        let oldPractice = trendRecord(profileID: profileID, date: now.addingTimeInterval(-40 * 24 * 60 * 60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0, practiceMode: .doublesPractice)
+        let recentX01 = trendRecord(profileID: profileID, date: now.addingTimeInterval(-2 * 24 * 60 * 60), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+
+        let filtered = GameRecordFilter(mode: .practice, date: .last30Days).filteredRecords(from: [recentPractice, oldPractice, recentX01], now: now)
+
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.id == recentPractice.id)
+    }
+
+    @Test func filteredProfileStatsUseMatchingRecordsOnly() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: true, average: 50, firstNineAverage: 55, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 170, totalFirstNinePoints: 90, totalFirstNineDarts: 9, practiceMode: .scoringDrill),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: false, average: 60, firstNineAverage: 60, checkoutAttempts: 2, checkoutHits: 1, totalDartsThrown: 20, totalPointsScored: 400, totalFirstNinePoints: 180, totalFirstNineDarts: 9),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 45, firstNineAverage: 50, checkoutAttempts: 1, checkoutHits: 0, totalDartsThrown: 12, totalPointsScored: 180, totalFirstNinePoints: 90, totalFirstNineDarts: 6, finishRule: GameMode.cricket.rawValue)
+        ]
+
+        let snapshot = FilteredProfileStatsBuilder.makeSnapshot(
+            for: profileID,
+            stats: PlayerProfileStats(),
+            records: records,
+            filter: GameRecordFilter(mode: .practice)
+        )
+
+        #expect(snapshot.recordCount == 1)
+        #expect(snapshot.gamesPlayed == 1)
+        #expect(snapshot.gamesWon == 1)
+    }
+
+    @Test func allTimeUnfilteredProfileStatsUseLifetimeStats() {
+        let profileID = UUID()
+        var stats = PlayerProfileStats()
+        stats.gamesPlayed = 12
+        stats.gamesWon = 8
+        stats.totalDartsThrown = 120
+        stats.totalPointsScored = 3600
+        stats.totalFirstNinePoints = 900
+        stats.totalFirstNineDarts = 45
+        stats.checkoutAttempts = 20
+        stats.checkoutHits = 10
+        stats.highestCheckout = 121
+        stats.highestTurnScore = 180
+        stats.highestScore = 180
+        stats.score180Count = 4
+        stats.score140PlusCount = 9
+
+        let snapshot = FilteredProfileStatsBuilder.makeSnapshot(
+            for: profileID,
+            stats: stats,
+            records: [],
+            filter: GameRecordFilter()
+        )
+
+        #expect(snapshot.gamesPlayed == 12)
+        #expect(snapshot.gamesWon == 8)
+        #expect(snapshot.average == stats.legAverage)
+        #expect(snapshot.score180Count == 4)
+    }
+
+    @Test func filteredProfileStatsCheckoutPercentageIsNilWithoutAttempts() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        ]
+
+        let snapshot = FilteredProfileStatsBuilder.makeSnapshot(
+            for: profileID,
+            stats: PlayerProfileStats(),
+            records: records,
+            filter: GameRecordFilter(mode: .x01)
+        )
+
+        #expect(snapshot.checkoutPercentage == nil)
+    }
+
+    @Test func filteredProfileStatsFirstNineAverageUsesSummedPointsAndDarts() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 50, firstNineAverage: 80, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 160, totalFirstNineDarts: 6),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 50, firstNineAverage: 20, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 60, totalFirstNineDarts: 9)
+        ]
+
+        let snapshot = FilteredProfileStatsBuilder.makeSnapshot(
+            for: profileID,
+            stats: PlayerProfileStats(),
+            records: records,
+            filter: GameRecordFilter(mode: .x01)
+        )
+
+        #expect(snapshot.firstNineAverage != nil)
+        #expect(abs((snapshot.firstNineAverage ?? 0) - 44.0) < 0.001)
+    }
+
+    @Test func filteredProfileStatsEmptyResultProducesEmptySnapshot() {
+        let snapshot = FilteredProfileStatsBuilder.makeSnapshot(
+            for: UUID(),
+            stats: PlayerProfileStats(),
+            records: [],
+            filter: GameRecordFilter(mode: .practice)
+        )
+
+        #expect(snapshot.hasRecords == false)
+        #expect(snapshot.gamesPlayed == nil)
+        #expect(snapshot.average == nil)
+    }
+
+    @Test func profileTrendsWinStreaksHandleCurrentAndBestStreaks() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 5), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 4), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 3), isWinner: false, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        ]
+
+        let snapshot = ProfileTrends.makeSnapshot(for: profileID, stats: PlayerProfileStats(), records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.currentWinStreak == 2)
+        #expect(snapshot.bestRecentWinStreak == 2)
+    }
+
+    @Test func profileTrendsCheckoutPercentageIsNilWithoutAttempts() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 50, firstNineAverage: nil, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 0, totalFirstNineDarts: 0)
+        ]
+
+        let snapshot = ProfileTrends.makeSnapshot(for: profileID, stats: PlayerProfileStats(), records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.checkoutPercentage.recentValue == nil)
+    }
+
+    @Test func profileTrendsFirstNineAverageUsesSummedPointsAndDarts() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 50, firstNineAverage: 80, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 160, totalFirstNineDarts: 6),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: true, average: 50, firstNineAverage: 20, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 60, totalFirstNineDarts: 9)
+        ]
+
+        let snapshot = ProfileTrends.makeSnapshot(for: profileID, stats: PlayerProfileStats(), records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.firstNineAverage.recentValue != nil)
+        #expect(abs((snapshot.firstNineAverage.recentValue ?? 0) - 44.0) < 0.001)
+    }
+
+    @Test func profileTrendsFewerThanFiveRecordsStillProduceSnapshot() {
+        let profileID = UUID()
+        let records = [
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 2), isWinner: true, average: 50, firstNineAverage: 60, checkoutAttempts: 1, checkoutHits: 1, totalDartsThrown: 10, totalPointsScored: 150, totalFirstNinePoints: 90, totalFirstNineDarts: 6),
+            trendRecord(profileID: profileID, date: .init(timeIntervalSince1970: 1), isWinner: false, average: 40, firstNineAverage: 45, checkoutAttempts: 0, checkoutHits: 0, totalDartsThrown: 12, totalPointsScored: 160, totalFirstNinePoints: 90, totalFirstNineDarts: 9)
+        ]
+
+        let snapshot = ProfileTrends.makeSnapshot(for: profileID, stats: PlayerProfileStats(), records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.sampleSize == 2)
+        #expect(snapshot.hasRecords == true)
+    }
+
+    @Test func profileTrendsEmptyHistoryProducesEmptySnapshot() {
+        let snapshot = ProfileTrends.makeSnapshot(for: UUID(), stats: PlayerProfileStats(), records: [], filter: GameRecordFilter())
+
+        #expect(snapshot.sampleSize == 0)
+        #expect(snapshot.hasRecords == false)
+        #expect(snapshot.average.recentValue == nil)
+        #expect(snapshot.checkoutPercentage.recentValue == nil)
+    }
+
+    @Test func headToHeadExcludesPracticeRecords() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+
+        let records = [
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 2),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                    rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)
+                ]
+            ),
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 1),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                    rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)
+                ],
+                practiceMode: .scoringDrill
+            )
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.count == 1)
+        #expect(snapshot.opponents[0].matchesPlayed == 1)
+    }
+
+    @Test func headToHeadIncludesX01AndCricket() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+
+        let records = [
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 2),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                    rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)
+                ]
+            ),
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 1),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: false),
+                    rivalryResult(profileID: blake.id, name: "Blake", isWinner: true)
+                ],
+                finishRule: GameMode.cricket.rawValue,
+                startingScore: 0
+            )
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.first?.matchesPlayed == 2)
+    }
+
+    @Test func headToHeadGroupsByOpponentProfileID() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+        let casey = PlayerProfile(id: UUID(), name: "Casey", colorHex: "#333333")
+
+        let records = [
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 2),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                    rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)
+                ]
+            ),
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 1),
+                playerResults: [
+                    rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                    rivalryResult(profileID: casey.id, name: "Casey", isWinner: false)
+                ]
+            )
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake, casey], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.count == 2)
+        #expect(Set(snapshot.opponents.map(\.opponentProfileID)) == Set([blake.id, casey.id]))
+    }
+
+    @Test func headToHeadIgnoresMatchesWithoutSelectedProfile() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+        let casey = PlayerProfile(id: UUID(), name: "Casey", colorHex: "#333333")
+
+        let record = rivalryRecord(
+            date: .init(timeIntervalSince1970: 1),
+            playerResults: [
+                rivalryResult(profileID: blake.id, name: "Blake", isWinner: true),
+                rivalryResult(profileID: casey.id, name: "Casey", isWinner: false)
+            ]
+        )
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake, casey], records: [record], filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.isEmpty)
+    }
+
+    @Test func headToHeadIgnoresUnprofiledOpponents() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+
+        let record = rivalryRecord(
+            date: .init(timeIntervalSince1970: 1),
+            playerResults: [
+                rivalryResult(profileID: alex.id, name: "Alex", isWinner: true),
+                rivalryResult(profileID: nil, name: "Guest", isWinner: false)
+            ]
+        )
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex], records: [record], filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.isEmpty)
+        #expect(snapshot.hasCompetitiveHistory == false)
+    }
+
+    @Test func headToHeadComputesWinsLossesAndWinRate() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+
+        let records = [
+            rivalryRecord(date: .init(timeIntervalSince1970: 3), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 2), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 1), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: false), rivalryResult(profileID: blake.id, name: "Blake", isWinner: true)])
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake], records: records, filter: GameRecordFilter())
+        let summary = try #require(snapshot.opponents.first)
+
+        #expect(summary.wins == 2)
+        #expect(summary.losses == 1)
+        #expect(abs(summary.winRate - (2.0 / 3.0)) < 0.001)
+    }
+
+    @Test func headToHeadComputesCurrentStreak() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+
+        let records = [
+            rivalryRecord(date: .init(timeIntervalSince1970: 4), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 3), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 2), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: false), rivalryResult(profileID: blake.id, name: "Blake", isWinner: true)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 1), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: false), rivalryResult(profileID: blake.id, name: "Blake", isWinner: true)])
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.first?.currentStreak == -2)
+    }
+
+    @Test func headToHeadRespectsActiveDateFilter() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+        let now = Date()
+
+        let recentRecord = rivalryRecord(
+            date: now.addingTimeInterval(-2 * 24 * 60 * 60),
+            playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]
+        )
+        let oldRecord = rivalryRecord(
+            date: now.addingTimeInterval(-50 * 24 * 60 * 60),
+            playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]
+        )
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(
+            for: alex,
+            profiles: [alex, blake],
+            records: [recentRecord, oldRecord],
+            filter: GameRecordFilter(date: .last30Days),
+            now: now
+        )
+
+        #expect(snapshot.opponents.first?.matchesPlayed == 1)
+    }
+
+    @Test func headToHeadSortsByMatchesPlayedThenMostRecent() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+        let casey = PlayerProfile(id: UUID(), name: "Casey", colorHex: "#333333")
+        let drew = PlayerProfile(id: UUID(), name: "Drew", colorHex: "#444444")
+
+        let records = [
+            rivalryRecord(date: .init(timeIntervalSince1970: 5), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 4), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 3), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: casey.id, name: "Casey", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 2), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: casey.id, name: "Casey", isWinner: false)]),
+            rivalryRecord(date: .init(timeIntervalSince1970: 1), playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: drew.id, name: "Drew", isWinner: false)])
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake, casey, drew], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.map(\.opponentProfileID) == [blake.id, casey.id, drew.id])
+    }
+
+    @Test func headToHeadProducesEmptySnapshotWhenNoCompetitiveRivalryExists() {
+        let alex = PlayerProfile(id: UUID(), name: "Alex", colorHex: "#111111")
+        let blake = PlayerProfile(id: UUID(), name: "Blake", colorHex: "#222222")
+
+        let records = [
+            rivalryRecord(
+                date: .init(timeIntervalSince1970: 1),
+                playerResults: [rivalryResult(profileID: alex.id, name: "Alex", isWinner: true), rivalryResult(profileID: blake.id, name: "Blake", isWinner: false)],
+                practiceMode: .scoringDrill
+            )
+        ]
+
+        let snapshot = HeadToHeadBuilder.makeSnapshot(for: alex, profiles: [alex, blake], records: records, filter: GameRecordFilter())
+
+        #expect(snapshot.opponents.isEmpty)
+        #expect(snapshot.hasCompetitiveHistory == false)
     }
 }

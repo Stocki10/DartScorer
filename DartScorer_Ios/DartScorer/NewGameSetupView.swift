@@ -23,6 +23,7 @@ struct NewGameSetupView: View {
     @State private var multiplayerUndoPermission: UndoPermission = .anyPlayer
     @State private var isShowingHosting = false
     @State private var isShowingJoining = false
+    @StateObject private var historyStore = GameHistoryStore()
 
     private var maxPlayers: Int {
         guard session.role == .host, !session.connectedPeers.isEmpty else { return 5 }
@@ -84,16 +85,10 @@ struct NewGameSetupView: View {
                 }
             }
             .navigationTitle("New Game")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", role: .destructive, action: onCancel)
-                }
-                ToolbarItem(placement: .principal) {
-                    Button {
-                        isShowingProfileManagement = true
-                    } label: {
-                        Image(systemName: "person.crop.circle")
-                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)
@@ -101,7 +96,7 @@ struct NewGameSetupView: View {
                 }
             }
             .sheet(isPresented: $isShowingProfileManagement) {
-                PlayerProfileView(store: profileStore)
+                PlayerProfileView(store: profileStore, historyStore: historyStore)
             }
             .sheet(isPresented: $isShowingHosting) {
                 NavigationStack {
@@ -162,117 +157,196 @@ struct NewGameSetupView: View {
 
     private var gameSettingsSection: some View {
         Section("Game Settings") {
-                Picker("Mode", selection: $gameMode) {
-                    ForEach(GameMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
+            modeSelectionRows
+            modeDescriptionCard
+            modeConfigurationRows
+            setModeBlock
+            playerCountRow
+        }
+    }
+
+    private var modeSelectionRows: some View {
+        Picker("Mode", selection: $gameMode) {
+            ForEach(GameMode.allCases) { mode in
+                Text(mode.label).tag(mode)
+            }
+        }
+        .pickerStyle(.menu)
+    }
+
+    private var modeDescriptionCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(modeDescriptionTitle)
+                .font(.subheadline.weight(.semibold))
+            Text(modeDescriptionText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private var modeConfigurationRows: some View {
+        if gameMode == .x01 {
+            Picker("Game", selection: $startScore) {
+                ForEach(StartScoreOption.allCases) { option in
+                    Text(option.label).tag(option)
                 }
+            }
             .pickerStyle(.menu)
 
-            Stepper(
-                L10n.format("Players: %@", "\(setupPlayers.count)"),
-                value: playerCountBinding,
-                in: minimumPlayers...maxPlayers
-            )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(modeDescriptionTitle)
-                    .font(.subheadline.weight(.semibold))
-                Text(modeDescriptionText)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            Picker("In Mode", selection: $inRule) {
+                ForEach(InRule.allCases) { rule in
+                    Text(rule.label).tag(rule)
+                }
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .pickerStyle(.menu)
 
-            if gameMode == .x01 {
-                Picker("Game", selection: $startScore) {
-                    ForEach(StartScoreOption.allCases) { option in
-                        Text(option.label).tag(option)
-                    }
+            Picker("Finish Mode", selection: $finishRule) {
+                ForEach(FinishRule.allCases) { rule in
+                    Text(rule.label).tag(rule)
                 }
-                .pickerStyle(.menu)
-
-                Picker("Finish Mode", selection: $finishRule) {
-                    ForEach(FinishRule.allCases) { rule in
-                        Text(rule.label).tag(rule)
-                    }
+            }
+            .pickerStyle(.menu)
+        } else if gameMode == .practice {
+            Picker("Practice Mode", selection: $practiceMode) {
+                ForEach(PracticeMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
                 }
-                .pickerStyle(.menu)
+            }
+            .pickerStyle(.menu)
 
-                Picker("In Mode", selection: $inRule) {
-                    ForEach(InRule.allCases) { rule in
-                        Text(rule.label).tag(rule)
-                    }
-                }
-                .pickerStyle(.menu)
+            if practiceMode.supportsCompetitiveGoal {
+                Toggle("Competitive Practice", isOn: $practiceCompetitiveEnabled)
 
-                Toggle("Set Mode", isOn: $setModeEnabled)
-                if setModeEnabled {
+                if practiceCompetitiveEnabled && setupPlayers.count > 1 {
                     Stepper(
-                        L10n.format("Legs to Win: %@", "\(legsToWin)"),
-                        value: $legsToWin,
-                        in: 1...10
+                        L10n.format("First to %@ Wins", "\(practiceSuccessesToWin)"),
+                        value: $practiceSuccessesToWin,
+                        in: 1...20
                     )
-                }
-            } else if gameMode == .practice {
-                Picker("Practice Mode", selection: $practiceMode) {
-                    ForEach(PracticeMode.allCases) { mode in
-                        Text(mode.label).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                if practiceMode.supportsCompetitiveGoal {
-                    Toggle("Competitive Practice", isOn: $practiceCompetitiveEnabled)
-
-                    if practiceCompetitiveEnabled && setupPlayers.count > 1 {
-                        Stepper(
-                            L10n.format("First to %@ Wins", "\(practiceSuccessesToWin)"),
-                            value: $practiceSuccessesToWin,
-                            in: 1...20
-                        )
-                    }
                 }
             }
         }
     }
 
+    @ViewBuilder
+    private var setModeBlock: some View {
+        if gameMode == .x01 {
+            Toggle(
+                "Set Mode",
+                isOn: Binding(
+                    get: { setModeEnabled },
+                    set: { newValue in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            setModeEnabled = newValue
+                        }
+                    }
+                )
+            )
+            .padding(.top, 6)
+
+            if setModeEnabled {
+                Stepper(
+                    L10n.format("Legs to Win: %@", "\(legsToWin)"),
+                    value: $legsToWin,
+                    in: 1...10
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+    }
+
+    private var playerCountRow: some View {
+        Stepper(
+            L10n.format("Players: %@", "\(setupPlayers.count)"),
+            value: playerCountBinding,
+            in: minimumPlayers...maxPlayers
+        )
+    }
+
+    private var playerOrderListHeight: CGFloat {
+        max(220, CGFloat(setupPlayers.count) * 52 + 16)
+    }
+
     private var playerOrderSection: some View {
         Section("Player Order") {
-            Text(L10n.string("Drag rows to set the throw sequence."))
+            Button {
+                isShowingProfileManagement = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle")
+                        .foregroundStyle(.tint)
+
+                    Text(L10n.string("Manage Profiles"))
+                        .font(.body)
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+
+            Text(L10n.string("Drag to reorder players and assign profiles"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             List {
                 ForEach($setupPlayers) { $player in
-                    HStack {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color(.systemGray4))
+                            .frame(width: 12, height: 12)
+                            .overlay(
+                                Circle().strokeBorder(
+                                    Color(.systemGray3),
+                                    lineWidth: player.colorHex == nil ? 1.5 : 0
+                                )
+                            )
+
+                        TextField(player.defaultName, text: $player.name)
+                            .textFieldStyle(.plain)
+                            .textInputAutocapitalization(.words)
+                            .disableAutocorrection(true)
+                            .font(.body.weight(.medium))
+
+                        Spacer(minLength: 8)
+
                         Button {
                             profilePickerPlayerID = player.id
                         } label: {
-                            Circle()
-                                .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color(.systemGray4))
-                                .frame(width: 22, height: 22)
-                                .overlay(
-                                    Circle().strokeBorder(
-                                        Color(.systemGray3),
-                                        lineWidth: player.colorHex == nil ? 1.5 : 0
-                                    )
-                                )
+                            HStack(spacing: 8) {
+                                if let label = profileButtonLabel(for: player) {
+                                    Text(label)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                        .foregroundStyle(player.profileID == nil ? Color.secondary : Color.primary)
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .buttonStyle(.plain)
-
-                        TextField(player.defaultName, text: $player.name)
-                            .textInputAutocapitalization(.words)
-                            .disableAutocorrection(true)
                     }
+                    .frame(height: 24)
+                    .padding(.vertical, 0)
                 }
                 .onMove(perform: movePlayers)
             }
             .listStyle(.plain)
-            .frame(minHeight: 250)
+            .scrollDisabled(true)
+            .frame(height: playerOrderListHeight)
+            .environment(\.defaultMinListRowHeight, 38)
             .environment(\.editMode, .constant(.active))
             .sheet(item: Binding(
                 get: { profilePickerPlayerID.map { ProfilePickerTarget(id: $0) } },
@@ -432,5 +506,19 @@ struct NewGameSetupView: View {
 
     private func movePlayers(from source: IndexSet, to destination: Int) {
         setupPlayers.move(fromOffsets: source, toOffset: destination)
+    }
+
+    private func profileButtonLabel(for player: SetupPlayer) -> String? {
+        if let profileID = player.profileID,
+           let profile = profileStore.profiles.first(where: { $0.id == profileID }) {
+            let trimmedPlayerName = player.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedProfileName = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedPlayerName.isEmpty,
+               trimmedPlayerName.caseInsensitiveCompare(trimmedProfileName) == .orderedSame {
+                return nil
+            }
+            return profile.name
+        }
+        return L10n.string("Assign")
     }
 }

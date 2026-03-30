@@ -276,7 +276,7 @@ struct DartsGameView: View {
             GameHistoryView(store: historyStore)
         }
         .sheet(isPresented: $isShowingProfiles) {
-            PlayerProfileView(store: profileStore)
+            PlayerProfileView(store: profileStore, historyStore: historyStore)
         }
         .sheet(isPresented: $isShowingShareSheet) {
             ShareSheet(items: shareItems)

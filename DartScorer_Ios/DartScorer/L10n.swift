@@ -1,26 +1,26 @@
 import Foundation
 
 enum L10n {
-    static func string(_ key: String) -> String {
+    nonisolated static func string(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }
 
-    static func format(_ key: String, _ arguments: CVarArg...) -> String {
+    nonisolated static func format(_ key: String, _ arguments: CVarArg...) -> String {
         String(format: string(key), locale: Locale.current, arguments: arguments)
     }
 
-    static func decimal(_ value: Double, fractionDigits: Int = 1) -> String {
+    nonisolated static func decimal(_ value: Double, fractionDigits: Int = 1) -> String {
         value.formatted(
             .number
                 .precision(.fractionLength(fractionDigits))
         )
     }
 
-    static func percent(_ value: Double) -> String {
+    nonisolated static func percent(_ value: Double) -> String {
         value.formatted(.percent.precision(.fractionLength(0)))
     }
 
-    static func localizedStoredRule(_ value: String) -> String {
+    nonisolated static func localizedStoredRule(_ value: String) -> String {
         switch value {
         case FinishRule.doubleOut.rawValue:
             return FinishRule.doubleOut.label
