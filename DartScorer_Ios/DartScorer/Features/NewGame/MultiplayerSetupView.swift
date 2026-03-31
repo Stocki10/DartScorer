@@ -108,7 +108,10 @@ struct QRHostView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { session.endSession(); onDismiss() }
+                ToolbarBackButton(action: {
+                    session.endSession()
+                    onDismiss()
+                }, accessibilityLabel: "Cancel")
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { onDismiss() }
@@ -169,7 +172,10 @@ struct QRJoinerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { session.endSession(); onDismiss() }
+                ToolbarBackButton(action: {
+                    session.endSession()
+                    onDismiss()
+                }, accessibilityLabel: "Cancel")
             }
         }
     }

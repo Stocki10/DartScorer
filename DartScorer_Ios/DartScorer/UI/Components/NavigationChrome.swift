@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ToolbarBackButton: View {
     let action: () -> Void
+    var accessibilityLabel: LocalizedStringKey = "Back"
 
     var body: some View {
         Button(action: action) {
@@ -17,6 +18,6 @@ struct ToolbarBackButton: View {
                 )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text("Back"))
+        .accessibilityLabel(Text(accessibilityLabel))
     }
 }

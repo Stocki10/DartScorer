@@ -78,7 +78,7 @@ struct TournamentListView: View {
             .navigationTitle("Tournaments")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Close")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -135,7 +135,7 @@ private struct TournamentListRow: View {
     let tournament: Tournament
 
     private var participantCountText: String {
-        "\(tournament.participants.count) players"
+        "\(tournament.participants.count) Players"
     }
 
     private var winnerName: String? {
@@ -162,7 +162,7 @@ private struct TournamentListRow: View {
                 Text("Winner: \(winnerName)")
                     .font(.subheadline.weight(.semibold))
             } else {
-                Text("\(tournament.completedMatchCount) of \(tournament.playableMatchCount) matches complete")
+                Text("\(tournament.completedMatchCount) of \(tournament.playableMatchCount) Matches Completed")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -287,32 +287,18 @@ private struct TournamentHeaderCard: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(tournament.statusLabel)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Capsule())
+                TournamentMatchStatusChip(
+                    title: tournament.statusLabel,
+                    color: tournament.status == .completed ? .green : .blue
+                )
             }
 
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Players")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("\(tournament.participants.count)")
-                        .font(.title3.weight(.semibold))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Progress")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("\(tournament.completedMatchCount)/\(tournament.playableMatchCount)")
-                        .font(.title3.weight(.semibold))
-                }
-
-                Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                summaryLine(systemImage: "person.3.fill", text: "\(tournament.participants.count) Players")
+                summaryLine(
+                    systemImage: "checkmark.circle.fill",
+                    text: "\(tournament.completedMatchCount) of \(tournament.playableMatchCount) Matches Completed"
+                )
             }
 
             if let winner {
@@ -329,6 +315,16 @@ private struct TournamentHeaderCard: View {
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
+
+    private func summaryLine(systemImage: String, text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.subheadline.weight(.semibold))
+        }
+    }
 }
 
 private struct TournamentBracketView: View {
@@ -337,42 +333,349 @@ private struct TournamentBracketView: View {
     let historyStore: GameHistoryStore
     let onPlayMatch: (TournamentMatchLaunchContext) -> Void
 
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(tournament.rounds) { round in
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(round.title)
-                            .font(.headline)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedRoundIndex = 0
 
-                        ForEach(matches(for: round)) { match in
-                            NavigationLink {
-                                TournamentMatchDetailView(
-                                    store: store,
-                                    historyStore: historyStore,
-                                    tournamentID: tournament.id,
-                                    matchID: match.id,
-                                    onPlayMatch: onPlayMatch
-                                )
-                            } label: {
-                                TournamentMatchCard(
-                                    tournament: tournament,
-                                    match: match
-                                )
+    var body: some View {
+        Group {
+            if horizontalSizeClass == .compact {
+                TournamentRoundPagerBracketView(
+                    store: store,
+                    tournament: tournament,
+                    historyStore: historyStore,
+                    selectedRoundIndex: $selectedRoundIndex,
+                    onPlayMatch: onPlayMatch
+                )
+            } else {
+                TournamentFullBracketView(
+                    store: store,
+                    tournament: tournament,
+                    historyStore: historyStore,
+                    onPlayMatch: onPlayMatch
+                )
+            }
+        }
+        .onAppear {
+            selectedRoundIndex = boundedRoundIndex(selectedRoundIndex)
+        }
+        .onChange(of: tournament.rounds.count) { _, _ in
+            selectedRoundIndex = boundedRoundIndex(selectedRoundIndex)
+        }
+    }
+
+    private func boundedRoundIndex(_ index: Int) -> Int {
+        guard !tournament.rounds.isEmpty else { return 0 }
+        return min(max(index, 0), tournament.rounds.count - 1)
+    }
+}
+
+private struct TournamentFullBracketView: View {
+    @ObservedObject var store: TournamentStore
+    let tournament: Tournament
+    let historyStore: GameHistoryStore
+    let onPlayMatch: (TournamentMatchLaunchContext) -> Void
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: BracketLayout.columnSpacing) {
+                    ForEach(Array(tournament.rounds.enumerated()), id: \.element.id) { index, round in
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(round.title)
+                                .font(.headline)
+
+                            VStack(spacing: BracketLayout.cardSpacing) {
+                                ForEach(matches(for: round)) { match in
+                                    NavigationLink {
+                                        TournamentMatchDetailView(
+                                            store: store,
+                                            historyStore: historyStore,
+                                            tournamentID: tournament.id,
+                                            matchID: match.id,
+                                            onPlayMatch: onPlayMatch
+                                        )
+                                    } label: {
+                                        BracketMatchCard(
+                                            tournament: tournament,
+                                            match: match
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .frame(width: BracketLayout.cardWidth, alignment: .topLeading)
+
+                        if let nextRound = tournament.rounds[safe: index + 1] {
+                            BracketConnectorColumn(
+                                sourceMatchCount: matches(for: round).count,
+                                targetMatchCount: matches(for: nextRound).count
+                            )
+                            .padding(.top, BracketLayout.roundTitleOffset)
                         }
                     }
-                    .frame(width: 250, alignment: .topLeading)
                 }
+                .padding(.trailing, BracketLayout.trailingInset)
+                .padding(.bottom, 8)
             }
-            .padding(.bottom, 8)
+
+            LinearGradient(
+                colors: [
+                    Color(.systemBackground).opacity(0),
+                    Color(.systemBackground).opacity(0.92)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 32)
+            .allowsHitTesting(false)
         }
     }
 
     private func matches(for round: TournamentRound) -> [TournamentMatch] {
         let matchesByID = Dictionary(uniqueKeysWithValues: tournament.matches.map { ($0.id, $0) })
         return round.matchIDs.compactMap { matchesByID[$0] }
+    }
+}
+
+private struct TournamentRoundPagerBracketView: View {
+    @ObservedObject var store: TournamentStore
+    let tournament: Tournament
+    let historyStore: GameHistoryStore
+    @Binding var selectedRoundIndex: Int
+    let onPlayMatch: (TournamentMatchLaunchContext) -> Void
+
+    private var rounds: [TournamentRound] {
+        tournament.rounds
+    }
+
+    private var pagerHeight: CGFloat {
+        guard let selectedRound = rounds[safe: selectedRoundIndex] else {
+            return BracketLayout.compactPageMinimumHeight
+        }
+
+        let matchCount = max(matches(for: selectedRound).count, 1)
+        return max(
+            BracketLayout.compactPageMinimumHeight,
+            CGFloat(matchCount) * BracketLayout.compactCardHeightEstimate +
+                CGFloat(max(matchCount - 1, 0)) * BracketLayout.cardSpacing
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            TournamentRoundSelector(
+                rounds: rounds,
+                selectedRoundIndex: $selectedRoundIndex
+            )
+
+            TournamentRoundPagerView(
+                store: store,
+                tournament: tournament,
+                historyStore: historyStore,
+                rounds: rounds,
+                selectedRoundIndex: $selectedRoundIndex,
+                onPlayMatch: onPlayMatch
+            )
+            .frame(height: pagerHeight)
+        }
+    }
+
+    private func matches(for round: TournamentRound) -> [TournamentMatch] {
+        let matchesByID = Dictionary(uniqueKeysWithValues: tournament.matches.map { ($0.id, $0) })
+        return round.matchIDs.compactMap { matchesByID[$0] }
+    }
+}
+
+private struct TournamentRoundSelector: View {
+    let rounds: [TournamentRound]
+    @Binding var selectedRoundIndex: Int
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(rounds.enumerated()), id: \.element.id) { index, round in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedRoundIndex = index
+                            }
+                        } label: {
+                            Text(round.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(selectedRoundIndex == index ? Color.accentColor : Color.primary)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(selectedRoundIndex == index ? Color.accentColor.opacity(0.14) : Color(.secondarySystemBackground))
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(
+                                            selectedRoundIndex == index ? Color.accentColor.opacity(0.28) : Color(.separator).opacity(0.14),
+                                            lineWidth: 0.8
+                                        )
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .id(index)
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .onAppear {
+                proxy.scrollTo(selectedRoundIndex, anchor: .center)
+            }
+            .onChange(of: selectedRoundIndex) { _, newValue in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(newValue, anchor: .center)
+                }
+            }
+        }
+    }
+}
+
+private struct TournamentRoundPagerView: View {
+    @ObservedObject var store: TournamentStore
+    let tournament: Tournament
+    let historyStore: GameHistoryStore
+    let rounds: [TournamentRound]
+    @Binding var selectedRoundIndex: Int
+    let onPlayMatch: (TournamentMatchLaunchContext) -> Void
+
+    var body: some View {
+        TabView(selection: $selectedRoundIndex) {
+            ForEach(Array(rounds.enumerated()), id: \.element.id) { index, round in
+                TournamentRoundPage(
+                    store: store,
+                    tournament: tournament,
+                    historyStore: historyStore,
+                    round: round,
+                    onPlayMatch: onPlayMatch
+                )
+                .tag(index)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+    }
+}
+
+private struct TournamentRoundPage: View {
+    @ObservedObject var store: TournamentStore
+    let tournament: Tournament
+    let historyStore: GameHistoryStore
+    let round: TournamentRound
+    let onPlayMatch: (TournamentMatchLaunchContext) -> Void
+
+    private var roundMatches: [TournamentMatch] {
+        let matchesByID = Dictionary(uniqueKeysWithValues: tournament.matches.map { ($0.id, $0) })
+        return round.matchIDs.compactMap { matchesByID[$0] }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: BracketLayout.cardSpacing) {
+            ForEach(roundMatches) { match in
+                NavigationLink {
+                    TournamentMatchDetailView(
+                        store: store,
+                        historyStore: historyStore,
+                        tournamentID: tournament.id,
+                        matchID: match.id,
+                        onPlayMatch: onPlayMatch
+                    )
+                } label: {
+                    BracketMatchCard(
+                        tournament: tournament,
+                        match: match
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private enum BracketLayout {
+    static let cardWidth: CGFloat = 282
+    static let cardHeight: CGFloat = 102
+    static let compactCardHeightEstimate: CGFloat = 118
+    static let compactPageMinimumHeight: CGFloat = 132
+    static let cardSpacing: CGFloat = 14
+    static let columnSpacing: CGFloat = 12
+    static let connectorWidth: CGFloat = 36
+    static let roundTitleOffset: CGFloat = 40
+    static let trailingInset: CGFloat = 52
+    static let cardPadding: CGFloat = 16
+    static let cardCornerRadius: CGFloat = 20
+    static let teamToSubtitleSpacing: CGFloat = 7
+    static let chevronSpacing: CGFloat = 8
+    static let badgeInsetTop: CGFloat = 12
+    static let badgeInsetTrailing: CGFloat = 12
+    static let contentTrailingClearance: CGFloat = 88
+}
+
+private struct BracketConnectorColumn: View {
+    let sourceMatchCount: Int
+    let targetMatchCount: Int
+
+    private var drawingHeight: CGFloat {
+        let rows = max(sourceMatchCount, 1)
+        return CGFloat(rows) * BracketLayout.cardHeight + CGFloat(max(rows - 1, 0)) * BracketLayout.cardSpacing
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            let stroke = StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round)
+            let color = Color(.systemGray3)
+            let sourceCenters = centers(for: sourceMatchCount)
+            let targetCenters = centers(for: targetMatchCount)
+
+            for targetIndex in targetCenters.indices {
+                let firstSourceIndex = min(targetIndex * 2, max(sourceCenters.count - 1, 0))
+                let secondSourceIndex = min(firstSourceIndex + 1, max(sourceCenters.count - 1, 0))
+                let firstSourceY = sourceCenters[firstSourceIndex]
+                let secondSourceY = sourceCenters[secondSourceIndex]
+                let targetY = targetCenters[targetIndex]
+
+                let sourceX: CGFloat = 0
+                let branchX: CGFloat = size.width * 0.28
+                let mergeX: CGFloat = size.width * 0.68
+                let targetX: CGFloat = size.width
+                let sourceMidY = (firstSourceY + secondSourceY) / 2
+
+                var path = Path()
+                path.move(to: CGPoint(x: sourceX, y: firstSourceY))
+                path.addLine(to: CGPoint(x: branchX, y: firstSourceY))
+
+                if secondSourceY != firstSourceY {
+                    path.move(to: CGPoint(x: sourceX, y: secondSourceY))
+                    path.addLine(to: CGPoint(x: branchX, y: secondSourceY))
+                    path.move(to: CGPoint(x: branchX, y: firstSourceY))
+                    path.addLine(to: CGPoint(x: branchX, y: secondSourceY))
+                }
+
+                path.move(to: CGPoint(x: branchX, y: sourceMidY))
+                path.addLine(to: CGPoint(x: mergeX, y: sourceMidY))
+                path.move(to: CGPoint(x: mergeX, y: min(sourceMidY, targetY)))
+                path.addLine(to: CGPoint(x: mergeX, y: max(sourceMidY, targetY)))
+                path.move(to: CGPoint(x: mergeX, y: targetY))
+                path.addLine(to: CGPoint(x: targetX, y: targetY))
+                context.stroke(path, with: .color(color), style: stroke)
+            }
+        }
+        .frame(width: BracketLayout.connectorWidth, height: drawingHeight)
+        .allowsHitTesting(false)
+    }
+
+    private func centers(for matchCount: Int) -> [CGFloat] {
+        guard matchCount > 0 else { return [BracketLayout.cardHeight / 2] }
+        return (0..<matchCount).map { index in
+            CGFloat(index) * (BracketLayout.cardHeight + BracketLayout.cardSpacing) + (BracketLayout.cardHeight / 2)
+        }
     }
 }
 
@@ -495,7 +798,7 @@ private struct TournamentMatchesSection: View {
                 onPlayMatch: onPlayMatch
             )
         } label: {
-            TournamentMatchCard(
+            ListMatchCard(
                 tournament: tournament,
                 match: match
             )
@@ -504,7 +807,7 @@ private struct TournamentMatchesSection: View {
     }
 }
 
-private struct TournamentMatchCard: View {
+private struct ListMatchCard: View {
     let tournament: Tournament
     let match: TournamentMatch
 
@@ -518,43 +821,58 @@ private struct TournamentMatchCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(tournament.format == .singleElimination
-                     ? (tournament.rounds.first(where: { $0.index == match.roundIndex })?.title ?? "Match")
-                     : roundRobinMatchLabel)
+            HStack(alignment: .center, spacing: 10) {
+                Text(tournament.format == .singleElimination ? "Match \(match.slotIndex + 1)" : roundRobinMatchLabel)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Spacer()
-                Text(statusLabel)
+
+                Spacer(minLength: 0)
+
+                if isByeMatch {
+                    TournamentSpecialStateChip(title: "Bye")
+                } else {
+                    TournamentMatchStatusChip(title: statusLabel, color: statusColor)
+                }
+
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(statusColor)
+                    .foregroundStyle(.tertiary)
             }
 
-            VStack(spacing: 8) {
-                participantRow(
-                    playerA,
-                    isWinner: match.winnerParticipantID != nil && match.winnerParticipantID == playerA?.id
-                )
-                participantRow(
-                    playerB,
-                    isWinner: match.winnerParticipantID != nil && match.winnerParticipantID == playerB?.id
-                )
-            }
+            if isByeMatch {
+                VStack(alignment: .leading, spacing: 10) {
+                    participantRow(winningParticipant, isWinner: true)
+                    Text(byeMessage)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    participantRow(
+                        playerA,
+                        isWinner: match.winnerParticipantID != nil && match.winnerParticipantID == playerA?.id
+                    )
+                    participantRow(
+                        playerB,
+                        isWinner: match.winnerParticipantID != nil && match.winnerParticipantID == playerB?.id
+                    )
+                }
 
-            if let result = match.result, !result.wasBye {
-                Text("\(result.playerALegsWon) - \(result.playerBLegsWon)")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                if let result = match.result, !result.wasBye {
+                    Text("\(result.playerALegsWon) - \(result.playerBLegsWon)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
             }
-
-            Text(match.status == .ready || match.status == .inProgress ? "Tap to view match" : "Tap to view details")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color(.separator).opacity(0.22), lineWidth: 0.8)
+        }
     }
 
     private func participantRow(_ participant: TournamentParticipant?, isWinner: Bool) -> some View {
@@ -565,7 +883,7 @@ private struct TournamentMatchCard: View {
 
             Text(participant?.name ?? "TBD")
                 .font(.subheadline.weight(isWinner ? .semibold : .regular))
-                .foregroundStyle(participant == nil ? .secondary : .primary)
+                .foregroundStyle(participant == nil ? .secondary : (isWinner ? .primary : .secondary))
 
             Spacer()
 
@@ -574,6 +892,22 @@ private struct TournamentMatchCard: View {
                     .foregroundStyle(.green)
             }
         }
+    }
+
+    private var isByeMatch: Bool {
+        match.status == .bye || match.result?.wasBye == true
+    }
+
+    private var winningParticipant: TournamentParticipant? {
+        if let winnerID = match.winnerParticipantID {
+            return tournament.participants.first(where: { $0.id == winnerID })
+        }
+        return playerA ?? playerB
+    }
+
+    private var byeMessage: String {
+        let name = winningParticipant?.name ?? "Player"
+        return "\(name) advances automatically"
     }
 
     private var statusLabel: String {
@@ -614,6 +948,168 @@ private struct TournamentMatchCard: View {
         case .completed, .bye:
             return .green
         }
+    }
+}
+
+private struct BracketMatchCard: View {
+    let tournament: Tournament
+    let match: TournamentMatch
+
+    private var playerA: TournamentParticipant? {
+        match.playerAParticipantID.flatMap { id in tournament.participants.first(where: { $0.id == id }) }
+    }
+
+    private var playerB: TournamentParticipant? {
+        match.playerBParticipantID.flatMap { id in tournament.participants.first(where: { $0.id == id }) }
+    }
+
+    private var winnerID: UUID? {
+        match.winnerParticipantID
+    }
+
+    private var isByeMatch: Bool {
+        match.status == .bye || match.result?.wasBye == true
+    }
+
+    private var winningParticipant: TournamentParticipant? {
+        if let winnerID {
+            return tournament.participants.first(where: { $0.id == winnerID })
+        }
+        return playerA ?? playerB
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isByeMatch {
+                VStack(alignment: .leading, spacing: 0) {
+                    participantName(winningParticipant, isWinner: true)
+
+                    Spacer()
+                        .frame(height: BracketLayout.teamToSubtitleSpacing)
+
+                    Text(byeMessage)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    participantName(playerA, isWinner: winnerID == playerA?.id)
+                    Spacer()
+                        .frame(height: 8)
+                    participantName(playerB, isWinner: winnerID == playerB?.id)
+
+                    if let result = match.result, !result.wasBye {
+                        Text("\(result.playerALegsWon) - \(result.playerBLegsWon)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.top, BracketLayout.teamToSubtitleSpacing)
+                    }
+                }
+            }
+        }
+        .padding(BracketLayout.cardPadding)
+        .padding(.trailing, BracketLayout.contentTrailingClearance)
+        .frame(maxWidth: .infinity, minHeight: BracketLayout.cardHeight, alignment: .topLeading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: BracketLayout.cardCornerRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: BracketLayout.cardCornerRadius, style: .continuous)
+                .stroke(Color(.separator).opacity(0.16), lineWidth: 0.8)
+        }
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: BracketLayout.chevronSpacing) {
+                if isByeMatch {
+                    TournamentSpecialStateChip(title: "Bye")
+                } else {
+                    TournamentMatchStatusChip(title: statusLabel, color: statusColor)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 2)
+            }
+            .padding(.top, BracketLayout.badgeInsetTop)
+            .padding(.trailing, BracketLayout.badgeInsetTrailing)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: BracketLayout.cardCornerRadius, style: .continuous))
+    }
+
+    private func participantName(_ participant: TournamentParticipant?, isWinner: Bool) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(participant.flatMap { Color(hex: $0.colorHex) } ?? Color(.systemGray4))
+                .frame(width: 10, height: 10)
+
+            Text(participant?.name ?? "TBD")
+                .font(.subheadline.weight(isWinner ? .semibold : .regular))
+                .foregroundStyle(participant == nil ? .tertiary : (isWinner ? .primary : .secondary))
+        }
+    }
+
+    private var byeMessage: String {
+        let name = winningParticipant?.name ?? "Player"
+        return "\(name) advances automatically"
+    }
+
+    private var statusLabel: String {
+        switch match.status {
+        case .pending:
+            return "Pending"
+        case .ready:
+            return "Ready"
+        case .inProgress:
+            return "In Progress"
+        case .completed:
+            return "Completed"
+        case .bye:
+            return "Bye"
+        }
+    }
+
+    private var statusColor: Color {
+        switch match.status {
+        case .pending:
+            return .secondary
+        case .ready:
+            return .blue
+        case .inProgress:
+            return .orange
+        case .completed:
+            return .green
+        case .bye:
+            return .mint
+        }
+    }
+}
+
+private struct TournamentMatchStatusChip: View {
+    let title: String
+    let color: Color
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+}
+
+private struct TournamentSpecialStateChip: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Color.mint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.mint.opacity(0.14))
+            .clipShape(Capsule())
     }
 }
 
@@ -964,7 +1460,7 @@ struct TournamentSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
@@ -1075,5 +1571,11 @@ private extension Tournament {
         case .completed:
             return "Completed"
         }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
