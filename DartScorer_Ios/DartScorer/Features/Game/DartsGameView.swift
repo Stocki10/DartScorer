@@ -46,6 +46,7 @@ struct DartsGameView: View {
     @State private var isShowingHistory = false
     @State private var isShowingTournaments = false
     @State private var isShowingProfiles = false
+    @State private var isShowingMatchManagement = false
     @State private var hasPersistedCompletedGame = false
     @State private var persistedCompletedRecord: GameRecord?
     @State private var activeTournamentMatchContext: TournamentMatchLaunchContext?
@@ -259,7 +260,6 @@ struct DartsGameView: View {
             VStack(alignment: .leading, spacing: 8) {
                 GameControlBar(
                     sessionRole: session.role,
-                    connectedPlayerCount: connectedPlayerCount,
                     isLegInProgress: game.isLegInProgress,
                     canUndo: game.canUndo,
                     canUndoLocally: session.canUndoLocally,
@@ -271,7 +271,7 @@ struct DartsGameView: View {
                             restartLeg()
                         }
                     },
-                    onShowDisconnectAlert: { isShowingDisconnectAlert = true },
+                    onShowMatchManagement: { isShowingMatchManagement = true },
                     onShowTournaments: { isShowingTournaments = true },
                     onShowProfiles: { isShowingProfiles = true },
                     onShowHistory: { isShowingHistory = true },
@@ -410,6 +410,14 @@ struct DartsGameView: View {
         }
         .sheet(isPresented: $isShowingProfiles) {
             PlayerProfileView(store: profileStore, historyStore: historyStore)
+        }
+        .sheet(isPresented: $isShowingMatchManagement) {
+            MatchManagementSheet(
+                game: game,
+                session: session,
+                connectedPlayerCount: connectedPlayerCount,
+                onRequestDisconnect: { isShowingDisconnectAlert = true }
+            )
         }
         .sheet(item: $sharePayload) { payload in
             ShareSheet(items: payload.items) {
