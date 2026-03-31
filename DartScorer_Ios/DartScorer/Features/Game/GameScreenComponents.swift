@@ -66,7 +66,7 @@ struct CricketBoardSection: View {
                             .padding(.vertical, 6)
                             .background(
                                 index == activePlayerIndex
-                                    ? (player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor).opacity(0.16)
+                                    ? (player.colorHex.flatMap { Color(hex: $0) } ?? AppAccentColor.currentColor).opacity(0.16)
                                     : Color(.secondarySystemBackground)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -98,7 +98,7 @@ struct CricketBoardSection: View {
                             .padding(.vertical, 6)
                             .background(
                                 index == activePlayerIndex
-                                    ? Color.accentColor.opacity(0.10)
+                                    ? AppAccentColor.currentColor.opacity(0.10)
                                     : Color(.tertiarySystemBackground)
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -162,6 +162,8 @@ struct GameControlBar: View {
 
             Button(action: onShowMatchManagement) {
                 Image(systemName: "flag.2.crossed")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 18, height: 18)
                     .overlay(alignment: .topTrailing) {
                         if sessionRole != .none {
                             Circle()
@@ -176,7 +178,7 @@ struct GameControlBar: View {
                     }
             }
             .buttonStyle(.bordered)
-            .tint(sessionRole != .none ? .green : nil)
+            .tint(sessionRole != .none ? .green : AppAccentColor.currentColor)
             .accessibilityLabel(Text("Match"))
 
             Button(action: onUndo) {
@@ -267,7 +269,7 @@ struct MatchManagementSheet: View {
                     ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
                         HStack(spacing: 10) {
                             Circle()
-                                .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
+                                .fill(player.colorHex.flatMap { Color(hex: $0) } ?? AppAccentColor.currentColor)
                                 .frame(width: 10, height: 10)
 
                             VStack(alignment: .leading, spacing: 2) {
@@ -353,7 +355,7 @@ struct ScoreboardSection: View {
                         HStack(spacing: 4) {
                             ForEach(Array(throwsForBadge.enumerated()), id: \.offset) { _, value in
                                 Text("\(value)")
-                                    .font(.footnote)
+                                    .font(.footnote.weight(.bold))
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
                                     .padding(.horizontal, 6)
@@ -403,14 +405,14 @@ struct ScoreboardSection: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 8)
                                 .frame(minHeight: 30)
-                                .background(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
+                                .background(player.colorHex.flatMap { Color(hex: $0) } ?? AppAccentColor.currentColor)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                         }
                     }
                 }
                 .padding(10)
                 .background {
-                    let playerColor = player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor
+                    let playerColor = player.colorHex.flatMap { Color(hex: $0) } ?? AppAccentColor.currentColor
                     return index == activePlayerIndex ? playerColor.opacity(0.18) : Color(.secondarySystemBackground)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -444,7 +446,7 @@ struct CheckoutBadgeView: View {
             .background(
                 isBogey
                     ? Color.orange.opacity(0.12)
-                    : (routes.isEmpty ? Color(.secondarySystemBackground) : Color.accentColor)
+                    : (routes.isEmpty ? Color(.secondarySystemBackground) : AppAccentColor.currentColor)
             )
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
@@ -461,7 +463,7 @@ struct PracticeObjectiveBadgeView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.accentColor)
+            .background(AppAccentColor.currentColor)
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

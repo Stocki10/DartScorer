@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 enum AppAccentColor {
+    static let redKey = "appAccentRed"
+    static let greenKey = "appAccentGreen"
+    static let blueKey = "appAccentBlue"
     static let defaultRed: Double = 0.0
     static let defaultGreen: Double = 122.0 / 255.0
     static let defaultBlue: Double = 1.0
@@ -25,6 +28,15 @@ enum AppAccentColor {
         }
         return (defaultRed, defaultGreen, defaultBlue)
     }
+
+    static var currentColor: Color {
+        let defaults = UserDefaults.standard
+        return makeColor(
+            red: defaults.object(forKey: redKey) as? Double ?? defaultRed,
+            green: defaults.object(forKey: greenKey) as? Double ?? defaultGreen,
+            blue: defaults.object(forKey: blueKey) as? Double ?? defaultBlue
+        )
+    }
 }
 
 private extension Double {
@@ -32,4 +44,3 @@ private extension Double {
         min(max(self, range.lowerBound), range.upperBound)
     }
 }
-

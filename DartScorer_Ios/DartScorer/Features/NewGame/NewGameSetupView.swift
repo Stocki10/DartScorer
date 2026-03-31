@@ -462,7 +462,7 @@ struct NewGameSetupView: View {
                         .padding(.vertical, 9)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(multiplayerModeSelection == mode ? Color.accentColor : Color.clear)
+                                .fill(multiplayerModeSelection == mode ? AppAccentColor.currentColor : Color.clear)
                         )
                         .foregroundStyle(multiplayerModeSelection == mode ? Color.white : Color.primary)
                 }

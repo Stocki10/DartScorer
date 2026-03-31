@@ -23,14 +23,14 @@ struct TournamentListView: View {
             List {
                 if ongoingTournaments.isEmpty && completedTournaments.isEmpty {
                     ContentUnavailableView(
-                        "No Tournaments Yet",
+                        L10n.string("No Tournaments Yet"),
                         systemImage: "trophy",
-                        description: Text("Create a tournament to manage a bracket or round robin schedule.")
+                        description: Text(L10n.string("Create a tournament to manage a bracket or round robin schedule."))
                     )
                 }
 
                 if !ongoingTournaments.isEmpty {
-                    Section("Ongoing") {
+                    Section(L10n.string("Ongoing")) {
                         ForEach(ongoingTournaments) { tournament in
                             NavigationLink {
                                 TournamentDetailView(
@@ -53,7 +53,7 @@ struct TournamentListView: View {
                 }
 
                 if !completedTournaments.isEmpty {
-                    Section("Completed") {
+                    Section(L10n.string("Completed")) {
                         ForEach(completedTournaments) { tournament in
                             NavigationLink {
                                 TournamentDetailView(
@@ -75,7 +75,7 @@ struct TournamentListView: View {
                     }
                 }
             }
-            .navigationTitle("Tournaments")
+            .navigationTitle(L10n.string("Tournaments"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Close")
@@ -100,10 +100,10 @@ struct TournamentListView: View {
                 }
             }
             .alert(deleteAlertTitle, isPresented: pendingDeleteAlertBinding) {
-                Button("Cancel", role: .cancel) {
+                Button(L10n.string("Cancel"), role: .cancel) {
                     pendingDeleteTournamentIDs = []
                 }
-                Button("Delete", role: .destructive) {
+                Button(L10n.string("Delete"), role: .destructive) {
                     pendingDeleteTournamentIDs.forEach(store.delete)
                     pendingDeleteTournamentIDs = []
                 }
@@ -121,13 +121,15 @@ struct TournamentListView: View {
     }
 
     private var deleteAlertTitle: String {
-        pendingDeleteTournamentIDs.count == 1 ? "Delete Tournament?" : "Delete Tournaments?"
+        pendingDeleteTournamentIDs.count == 1
+            ? L10n.string("Delete Tournament?")
+            : L10n.string("Delete Tournaments?")
     }
 
     private var deleteAlertMessage: String {
         pendingDeleteTournamentIDs.count == 1
-            ? "This will permanently remove the tournament and its bracket or standings."
-            : "This will permanently remove the selected tournaments and their brackets or standings."
+            ? L10n.string("This will permanently remove the tournament and its bracket or standings.")
+            : L10n.string("This will permanently remove the selected tournaments and their brackets or standings.")
     }
 }
 
@@ -135,7 +137,7 @@ private struct TournamentListRow: View {
     let tournament: Tournament
 
     private var participantCountText: String {
-        "\(tournament.participants.count) Players"
+        L10n.format("%d Players", tournament.participants.count)
     }
 
     private var winnerName: String? {
@@ -159,10 +161,10 @@ private struct TournamentListRow: View {
                 .foregroundStyle(.secondary)
 
             if let winnerName {
-                Text("Winner: \(winnerName)")
+                Text(L10n.format("Winner: %@", winnerName))
                     .font(.subheadline.weight(.semibold))
             } else {
-                Text("\(tournament.completedMatchCount) of \(tournament.playableMatchCount) Matches Completed")
+                Text(L10n.format("%d of %d Matches Completed", tournament.completedMatchCount, tournament.playableMatchCount))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -181,11 +183,11 @@ private enum TournamentDetailTab: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .bracket:
-            return "Bracket"
+            return L10n.string("Bracket")
         case .table:
-            return "Table"
+            return L10n.string("Table")
         case .matches:
-            return "Matches"
+            return L10n.string("Matches")
         }
     }
 }
@@ -304,7 +306,7 @@ private struct TournamentHeaderCard: View {
             if let winner {
                 HStack(spacing: 10) {
                     Circle()
-                        .fill(Color(hex: winner.colorHex) ?? .accentColor)
+                        .fill(Color(hex: winner.colorHex) ?? AppAccentColor.currentColor)
                         .frame(width: 12, height: 12)
                     Text("Winner: \(winner.name)")
                         .font(.headline)
@@ -503,17 +505,17 @@ private struct TournamentRoundSelector: View {
                         } label: {
                             Text(round.title)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(selectedRoundIndex == index ? Color.accentColor : Color.primary)
+                                .foregroundStyle(selectedRoundIndex == index ? AppAccentColor.currentColor : Color.primary)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(selectedRoundIndex == index ? Color.accentColor.opacity(0.14) : Color(.secondarySystemBackground))
+                                        .fill(selectedRoundIndex == index ? AppAccentColor.currentColor.opacity(0.14) : Color(.secondarySystemBackground))
                                 )
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .stroke(
-                                            selectedRoundIndex == index ? Color.accentColor.opacity(0.28) : Color(.separator).opacity(0.14),
+                                            selectedRoundIndex == index ? AppAccentColor.currentColor.opacity(0.28) : Color(.separator).opacity(0.14),
                                             lineWidth: 0.8
                                         )
                                 }
@@ -703,7 +705,7 @@ private struct TournamentStandingsView: View {
                 HStack {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color(hex: standing.participant.colorHex) ?? .accentColor)
+                            .fill(Color(hex: standing.participant.colorHex) ?? AppAccentColor.currentColor)
                             .frame(width: 10, height: 10)
                         Text(standing.participant.name)
                     }
@@ -1398,7 +1400,7 @@ struct TournamentSetupView: View {
                         } label: {
                             HStack(spacing: 12) {
                                 Circle()
-                                    .fill(Color(hex: profile.colorHex) ?? .accentColor)
+                                    .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                                     .frame(width: 12, height: 12)
 
                                 Text(profile.name)
@@ -1430,7 +1432,7 @@ struct TournamentSetupView: View {
                                 ForEach(selectedProfiles) { profile in
                                     HStack(spacing: 12) {
                                         Circle()
-                                            .fill(Color(hex: profile.colorHex) ?? .accentColor)
+                                            .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                                             .frame(width: 12, height: 12)
 
                                         Text(profile.name)

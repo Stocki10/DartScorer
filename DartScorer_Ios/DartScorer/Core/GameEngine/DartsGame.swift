@@ -246,6 +246,11 @@ final class DartsGame: ObservableObject {
         return dartsThrownByPlayerID.values.contains { $0 > 0 }
     }
 
+    var hasResumableProgress: Bool {
+        guard winner == nil else { return false }
+        return isLegInProgress || !completedLegs.isEmpty
+    }
+
     var cricketTargets: [CricketTarget] {
         CricketTarget.allCases
     }
@@ -983,6 +988,17 @@ extension DartsGame {
         )
     }
 
+    func buildPersistedSnapshot() -> PersistedDartsGameSnapshot {
+        PersistedDartsGameSnapshot(
+            networkState: buildNetworkSnapshot(),
+            completedLegs: completedLegs,
+            currentLegStartingPlayerID: currentLegStartingPlayerID,
+            scoredDartPointsHistoryByPlayerID: scoredDartPointsHistoryByPlayerID.stringKeyed,
+            bustCountByPlayerID: bustCountByPlayerID.stringKeyed,
+            currentLegVisitsByPlayerID: currentLegVisitsByPlayerID.stringKeyed
+        )
+    }
+
     func applySnapshot(_ state: NetworkGameState) {
         history.removeAll()
         players = state.players
@@ -1021,6 +1037,15 @@ extension DartsGame {
         bustCountByPlayerID = [:]
         currentLegVisitsByPlayerID = [:]
     }
+
+    func applyPersistedSnapshot(_ snapshot: PersistedDartsGameSnapshot) {
+        applySnapshot(snapshot.networkState)
+        completedLegs = snapshot.completedLegs
+        currentLegStartingPlayerID = snapshot.currentLegStartingPlayerID
+        scoredDartPointsHistoryByPlayerID = snapshot.scoredDartPointsHistoryByPlayerID.uuidKeyed()
+        bustCountByPlayerID = snapshot.bustCountByPlayerID.uuidKeyed()
+        currentLegVisitsByPlayerID = snapshot.currentLegVisitsByPlayerID.uuidKeyed()
+    }
 }
 
 private struct GameSnapshot {
@@ -1057,6 +1082,15 @@ private struct GameSnapshot {
     let scoredDartPointsHistoryByPlayerID: [UUID: [Int]]
     let bustCountByPlayerID: [UUID: Int]
     let currentLegVisitsByPlayerID: [UUID: [LegPlayerVisit]]
+}
+
+struct PersistedDartsGameSnapshot: Codable {
+    let networkState: NetworkGameState
+    let completedLegs: [LegRecord]
+    let currentLegStartingPlayerID: UUID?
+    let scoredDartPointsHistoryByPlayerID: [String: [Int]]
+    let bustCountByPlayerID: [String: Int]
+    let currentLegVisitsByPlayerID: [String: [LegPlayerVisit]]
 }
 
 private extension DartsGame {

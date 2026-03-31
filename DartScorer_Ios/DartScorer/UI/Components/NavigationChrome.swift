@@ -2,19 +2,20 @@ import SwiftUI
 
 struct ToolbarBackButton: View {
     let action: () -> Void
+    var systemImage: String = "chevron.left"
     var accessibilityLabel: LocalizedStringKey = "Back"
+    private var accentColor: Color { AppAccentColor.currentColor }
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left")
+            Image(systemName: systemImage)
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
-                .background(Color(.systemBackground))
-                .clipShape(Circle())
-                .overlay(
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(accentColor)
+                .padding(10)
+                .background(
                     Circle()
-                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                        .fill(accentColor.opacity(0.12))
                 )
         }
         .buttonStyle(.plain)
