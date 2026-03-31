@@ -153,6 +153,10 @@ struct NewGameSetupView: View {
             } else {
                 multiplayerModeSelection = .off
             }
+
+            if gameMode == .x01, setModeEnabled {
+                legsToWin = max(2, legsToWin)
+            }
         }
         .onChange(of: multiplayerModeSelection) { _, mode in
             handleMultiplayerModeSelectionChange(mode)
@@ -165,8 +169,10 @@ struct NewGameSetupView: View {
             case .joiner:
                 multiplayerModeSelection = .join
             case .none:
-                multiplayerModeSelection = .off
-                isJoinScannerVisible = false
+                if multiplayerModeSelection != .join {
+                    multiplayerModeSelection = .off
+                    isJoinScannerVisible = false
+                }
             }
         }
         .onChange(of: gameMode) { _, mode in
@@ -186,6 +192,11 @@ struct NewGameSetupView: View {
         .onChange(of: practiceMode) { _, mode in
             if !mode.supportsCompetitiveGoal {
                 practiceCompetitiveEnabled = false
+            }
+        }
+        .onChange(of: setModeEnabled) { _, isEnabled in
+            if isEnabled {
+                legsToWin = max(2, legsToWin)
             }
         }
     }
@@ -287,8 +298,11 @@ struct NewGameSetupView: View {
             if setModeEnabled {
                 Stepper(
                     L10n.format("Legs to Win: %@", "\(legsToWin)"),
-                    value: $legsToWin,
-                    in: 1...10
+                    value: Binding(
+                        get: { max(2, legsToWin) },
+                        set: { legsToWin = max(2, $0) }
+                    ),
+                    in: 2...10
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
@@ -476,6 +490,9 @@ struct NewGameSetupView: View {
 
     private var canStartGame: Bool {
         guard session.role != .joiner else { return false }
+        if multiplayerModeSelection == .host && session.connectedPeers.isEmpty {
+            return false
+        }
         guard session.role == .host, multiplayerInputMode != .free else { return true }
         return allMultiplayerPlayersAssigned
     }

@@ -132,30 +132,17 @@ struct CricketBoardSection: View {
 
 struct GameControlBar: View {
     let sessionRole: SessionRole
-    let connectedPlayerCount: Int
     let isLegInProgress: Bool
     let canUndo: Bool
     let canUndoLocally: Bool
     let onNewGame: () -> Void
     let onRestartLeg: () -> Void
-    let onShowDisconnectAlert: () -> Void
+    let onShowMatchManagement: () -> Void
     let onShowTournaments: () -> Void
     let onShowProfiles: () -> Void
     let onShowHistory: () -> Void
     let onShowSettings: () -> Void
     let onUndo: () -> Void
-
-    private var isMultiplayerActive: Bool {
-        sessionRole != .none
-    }
-
-    private var multiplayerLabel: String {
-        connectedPlayerCount <= 1 ? "Connecting" : "\(connectedPlayerCount) Players"
-    }
-
-    private var multiplayerTint: Color {
-        sessionRole == .joiner ? .orange : .green
-    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -173,20 +160,24 @@ struct GameControlBar: View {
 
             Spacer(minLength: 0)
 
-            if isMultiplayerActive {
-                Button(action: onShowDisconnectAlert) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(multiplayerTint)
-                            .frame(width: 8, height: 8)
-                        Text(multiplayerLabel)
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
+            Button(action: onShowMatchManagement) {
+                Image(systemName: "flag.2.crossed")
+                    .overlay(alignment: .topTrailing) {
+                        if sessionRole != .none {
+                            Circle()
+                                .fill(.green)
+                                .frame(width: 8, height: 8)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color(.systemBackground), lineWidth: 1.5)
+                                )
+                                .offset(x: 3, y: -3)
+                        }
                     }
-                }
-                .buttonStyle(.bordered)
-                .tint(multiplayerTint)
             }
+            .buttonStyle(.bordered)
+            .tint(sessionRole != .none ? .green : nil)
+            .accessibilityLabel(Text("Match"))
 
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
@@ -200,16 +191,146 @@ struct GameControlBar: View {
                 Button("Tournaments", action: onShowTournaments)
                     .disabled(sessionRole != .none)
                 Button("Settings", action: onShowSettings)
-
-                if isMultiplayerActive {
-                    Divider()
-                    Button(sessionRole == .host ? "Stop Multiplayer" : "Leave Session", role: .destructive, action: onShowDisconnectAlert)
-                }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
             .compositingGroup()
             .buttonStyle(.bordered)
+        }
+    }
+}
+
+struct MatchManagementSheet: View {
+    @ObservedObject var game: DartsGame
+    @ObservedObject var session: MultipeerSessionManager
+    let connectedPlayerCount: Int
+    let onRequestDisconnect: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var matchTitle: String {
+        switch game.gameMode {
+        case .x01:
+            return "\(game.startingScore)"
+        case .cricket:
+            return "Cricket"
+        case .practice:
+            return game.practiceMode.label
+        }
+    }
+
+    private var matchSubtitle: String {
+        switch game.gameMode {
+        case .x01:
+            return [game.inRule.label, game.finishRule.label].joined(separator: " • ")
+        case .cricket:
+            return "Close 20 through 15 and Bull"
+        case .practice:
+            return game.practiceCompetitiveEnabled
+                ? "Competitive practice"
+                : "Solo practice"
+        }
+    }
+
+    private var multiplayerStatusText: String {
+        connectedPlayerCount == 1 ? "Connecting…" : "\(connectedPlayerCount) Players Connected"
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(matchTitle)
+                            .font(.headline)
+                        Text(matchSubtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+                }
+
+                if session.role != .none {
+                    Section("Multiplayer") {
+                        settingsRow("Session", value: multiplayerStatusText)
+                        settingsRow("Role", value: session.role == .host ? "Host" : "Joiner")
+
+                        Button(session.role == .host ? "Stop Multiplayer" : "Leave Session", role: .destructive) {
+                            dismiss()
+                            onRequestDisconnect()
+                        }
+                    }
+                }
+
+                Section("Players") {
+                    ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
+                                .frame(width: 10, height: 10)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(player.name)
+                                    .font(.body.weight(index == game.activePlayerIndex ? .semibold : .regular))
+                                if index == game.activePlayerIndex {
+                                    Text("Current Player")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            if game.gameMode == .x01 {
+                                Text("\(player.score)")
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                            } else if game.gameMode == .cricket {
+                                Text("\(game.cricketScore(for: player))")
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                Section("Match Settings") {
+                    settingsRow("Mode", value: game.gameMode.label)
+
+                    if game.gameMode == .x01 {
+                        settingsRow("Start Score", value: "\(game.startingScore)")
+                        settingsRow("In Mode", value: game.inRule.label)
+                        settingsRow("Finish Mode", value: game.finishRule.label)
+                        if game.setModeEnabled {
+                            settingsRow("Legs to Win", value: "\(game.legsToWin)")
+                        }
+                    } else if game.gameMode == .practice {
+                        settingsRow("Practice Mode", value: game.practiceMode.label)
+                        if game.practiceCompetitiveEnabled {
+                            settingsRow("First to Wins", value: "\(game.practiceSuccessesToWin)")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Match")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Close")
+                }
+            }
+        }
+    }
+
+    private func settingsRow(_ title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
         }
     }
 }
@@ -227,16 +348,6 @@ struct ScoreboardSection: View {
             ForEach(Array(players.enumerated()), id: \.element.id) { index, player in
                 HStack {
                     Text(player.name)
-                    if setModeEnabled {
-                        Text("\(legsWon(player))")
-                            .font(.footnote)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                    }
                     let throwsForBadge = throwsToDisplay(player, index)
                     if !throwsForBadge.isEmpty {
                         HStack(spacing: 4) {
@@ -269,12 +380,32 @@ struct ScoreboardSection: View {
                         }
                     }
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(player.score)")
-                            .fontWeight(.semibold)
-                        Text("⌀ \(L10n.decimal(legAverage(player) ?? 0.0))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(player.score)")
+                                .fontWeight(.semibold)
+                                .monospacedDigit()
+
+                            Text("⌀ \(L10n.decimal(legAverage(player) ?? 0.0))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if setModeEnabled {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.35))
+                                .frame(width: 1, height: 30)
+                                .padding(.leading, 2)
+                            Text("\(legsWon(player))")
+                                .font(.footnote)
+                                .fontWeight(.bold)
+                                .monospacedDigit()
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .frame(minHeight: 30)
+                                .background(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                        }
                     }
                 }
                 .padding(10)

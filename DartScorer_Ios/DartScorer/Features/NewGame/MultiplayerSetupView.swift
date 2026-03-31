@@ -297,6 +297,7 @@ struct InlineHostLobbyView: View {
                     Spacer()
                 }
                 .padding(.vertical, 8)
+                .listRowSeparator(.hidden)
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -472,6 +473,7 @@ struct InlineJoinLobbyView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .buttonStyle(.borderedProminent)
+                .listRowSeparator(.hidden)
 
                 if isScannerVisible {
                     VStack(alignment: .leading, spacing: 12) {
@@ -484,6 +486,7 @@ struct InlineJoinLobbyView: View {
                             .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 260)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+                    .listRowSeparator(.hidden)
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
@@ -524,10 +527,12 @@ private final class QRScannerView: UIView {
     var onScan: ((String) -> Void)?
     private var captureSession: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
+    private let sessionQueue = DispatchQueue(label: "com.leonstockmann.DartScorer.qrscanner")
+    private var isConfiguringSession = false
 
-    override func didMoveToSuperview() {
-        super.didMoveToSuperview()
-        guard superview != nil else {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else {
             tearDownScanner()
             return
         }
@@ -535,29 +540,93 @@ private final class QRScannerView: UIView {
     }
 
     private func startScanning() {
-        guard captureSession == nil else { return }
-        let s = AVCaptureSession()
-        guard let device = AVCaptureDevice.default(for: .video),
-              let input = try? AVCaptureDeviceInput(device: device), s.canAddInput(input) else { return }
-        s.addInput(input)
-        let output = AVCaptureMetadataOutput()
-        guard s.canAddOutput(output) else { return }
-        s.addOutput(output)
-        output.setMetadataObjectsDelegate(self, queue: .main)
-        output.metadataObjectTypes = [.qr]
-        let preview = AVCaptureVideoPreviewLayer(session: s)
-        preview.videoGravity = .resizeAspectFill
-        layer.addSublayer(preview)
-        previewLayer = preview
-        DispatchQueue.global(qos: .userInitiated).async { s.startRunning() }
-        captureSession = s
+        guard captureSession == nil, !isConfiguringSession else { return }
+
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            configureAndStartSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                guard granted else { return }
+                DispatchQueue.main.async {
+                    self?.configureAndStartSession()
+                }
+            }
+        case .denied, .restricted:
+            return
+        @unknown default:
+            return
+        }
+    }
+
+    private func configureAndStartSession() {
+        guard captureSession == nil, !isConfiguringSession else { return }
+        isConfiguringSession = true
+
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+
+            let session = AVCaptureSession()
+            guard let device = AVCaptureDevice.default(for: .video),
+                  let input = try? AVCaptureDeviceInput(device: device),
+                  session.canAddInput(input) else {
+                DispatchQueue.main.async {
+                    self.isConfiguringSession = false
+                }
+                return
+            }
+
+            session.beginConfiguration()
+            session.addInput(input)
+
+            let output = AVCaptureMetadataOutput()
+            guard session.canAddOutput(output) else {
+                session.commitConfiguration()
+                DispatchQueue.main.async {
+                    self.isConfiguringSession = false
+                }
+                return
+            }
+
+            session.addOutput(output)
+            output.setMetadataObjectsDelegate(self, queue: .main)
+            output.metadataObjectTypes = [.qr]
+            session.commitConfiguration()
+
+            DispatchQueue.main.async {
+                guard self.window != nil else {
+                    self.isConfiguringSession = false
+                    return
+                }
+
+                let preview = AVCaptureVideoPreviewLayer(session: session)
+                preview.videoGravity = .resizeAspectFill
+                preview.frame = self.bounds
+                self.layer.addSublayer(preview)
+                self.previewLayer = preview
+                self.captureSession = session
+                self.isConfiguringSession = false
+
+                self.sessionQueue.async {
+                    session.startRunning()
+                }
+            }
+        }
     }
 
     private func tearDownScanner() {
-        captureSession?.stopRunning()
+        let session = captureSession
         captureSession = nil
+        if let session {
+            sessionQueue.async {
+                if session.isRunning {
+                    session.stopRunning()
+                }
+            }
+        }
         previewLayer?.removeFromSuperlayer()
         previewLayer = nil
+        isConfiguringSession = false
     }
 
     override func layoutSubviews() {
@@ -571,11 +640,13 @@ private final class QRScannerView: UIView {
 }
 
 extension QRScannerView: AVCaptureMetadataOutputObjectsDelegate {
-    func metadataOutput(_ output: AVCaptureMetadataOutput,
-                        didOutput objects: [AVMetadataObject], from connection: AVCaptureConnection) {
+    nonisolated func metadataOutput(_ output: AVCaptureMetadataOutput,
+                                    didOutput objects: [AVMetadataObject], from connection: AVCaptureConnection) {
         guard let obj = objects.first as? AVMetadataMachineReadableCodeObject,
               let value = obj.stringValue else { return }
-        tearDownScanner()
-        onScan?(value)
+        DispatchQueue.main.async { [weak self] in
+            self?.tearDownScanner()
+            self?.onScan?(value)
+        }
     }
 }
