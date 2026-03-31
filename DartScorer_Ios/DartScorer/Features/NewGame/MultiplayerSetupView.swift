@@ -86,7 +86,7 @@ struct QRHostView: View {
                     let currentDeviceID = assignedDeviceID(for: player.id, in: session.playerAssignments)
                     HStack {
                         Circle()
-                            .fill(player.colorHex.flatMap { Color(hex: $0) } ?? Color.accentColor)
+                            .fill(player.colorHex.flatMap { Color(hex: $0) } ?? AppAccentColor.currentColor)
                             .frame(width: 12, height: 12)
                         Text(player.name)
                         Spacer()
@@ -446,7 +446,7 @@ struct InlineJoinLobbyView: View {
                     icon: "checkmark.circle",
                     title: L10n.string("Joined Game"),
                     message: L10n.string("Waiting for host to start…"),
-                    tint: .accentColor
+                    tint: AppAccentColor.currentColor
                 )
 
                 Text(L10n.format("Connected to %@", session.connectedPeers.first?.displayName ?? L10n.string("host")))

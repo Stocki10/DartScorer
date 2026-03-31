@@ -32,13 +32,13 @@ struct GameRecordFilterControls: View {
                         } label: {
                             Text(option.label)
                                 .font(.footnote.weight(.medium))
-                                .foregroundStyle(filter.date == option ? Color.accentColor : Color.secondary)
+                                .foregroundStyle(filter.date == option ? AppAccentColor.currentColor : Color.secondary)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .background(
                                     (
                                         filter.date == option
-                                        ? Color.accentColor.opacity(0.14)
+                                        ? AppAccentColor.currentColor.opacity(0.14)
                                         : Color(.secondarySystemBackground)
                                     ),
                                     in: Capsule()
@@ -104,11 +104,11 @@ struct HistoryPrimaryFilterBar: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: showsActiveIndicator ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                         .font(.title3)
-                        .foregroundStyle(showsActiveIndicator ? Color.accentColor : Color.primary)
+                        .foregroundStyle(showsActiveIndicator ? AppAccentColor.currentColor : Color.primary)
 
                     if showsActiveIndicator {
                         Circle()
-                            .fill(Color.accentColor)
+                            .fill(AppAccentColor.currentColor)
                             .frame(width: 8, height: 8)
                             .offset(x: 2, y: -2)
                     }
@@ -242,7 +242,7 @@ struct HistoryFilterSheet: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(AppAccentColor.currentColor)
                 }
             }
         }

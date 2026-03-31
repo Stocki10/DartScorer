@@ -5,11 +5,26 @@ private struct PresentedTournamentDetailTarget: Identifiable {
     let id: UUID
 }
 
+enum DartsGameLaunchIntent: String, Identifiable {
+    case automaticSetup
+    case resume
+    case newMatch
+    case practice
+
+    nonisolated var id: String { rawValue }
+}
+
 struct DartsGameView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var game: DartsGame
     @ObservedObject var session: MultipeerSessionManager
     @ObservedObject var tournamentStore: TournamentStore
-    @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.light.rawValue
+    @ObservedObject var historyStore: GameHistoryStore
+    @ObservedObject var profileStore: PlayerProfileStore
+    @Binding var activeTournamentMatchContext: TournamentMatchLaunchContext?
+    let initialEntryIntent: DartsGameLaunchIntent
+    let initialTournamentMatchContext: TournamentMatchLaunchContext?
+    @AppStorage("appThemeMode") private var appThemeModeRaw = AppThemeMode.system.rawValue
     @AppStorage("newGamePlayerNamesJSON") private var storedNewGamePlayerNamesJSON = ""
     @AppStorage("newGamePlayerProfileIDsJSON") private var storedPlayerProfileIDsJSON = ""
     @AppStorage("newGameMode") private var storedNewGameModeRaw = GameMode.x01.rawValue
@@ -49,18 +64,35 @@ struct DartsGameView: View {
     @State private var isShowingMatchManagement = false
     @State private var hasPersistedCompletedGame = false
     @State private var persistedCompletedRecord: GameRecord?
-    @State private var activeTournamentMatchContext: TournamentMatchLaunchContext?
     @State private var presentedTournamentDetailTarget: PresentedTournamentDetailTarget?
     @State private var sharePayload: ShareSheetPayload?
     @State private var isPreparingShare = false
-    @StateObject private var historyStore = GameHistoryStore()
-    @ObservedObject var profileStore: PlayerProfileStore
-    @State private var draftThemeMode: AppThemeMode = .light
+    @State private var draftThemeMode: AppThemeMode = .system
     @State private var draftAccentColor: Color = AppAccentColor.makeColor(
         red: AppAccentColor.defaultRed,
         green: AppAccentColor.defaultGreen,
         blue: AppAccentColor.defaultBlue
     )
+
+    init(
+        game: DartsGame,
+        session: MultipeerSessionManager,
+        tournamentStore: TournamentStore,
+        historyStore: GameHistoryStore,
+        profileStore: PlayerProfileStore,
+        activeTournamentMatchContext: Binding<TournamentMatchLaunchContext?>,
+        initialEntryIntent: DartsGameLaunchIntent = .automaticSetup,
+        initialTournamentMatchContext: TournamentMatchLaunchContext? = nil
+    ) {
+        self.game = game
+        self.session = session
+        self.tournamentStore = tournamentStore
+        self.historyStore = historyStore
+        self.profileStore = profileStore
+        self._activeTournamentMatchContext = activeTournamentMatchContext
+        self.initialEntryIntent = initialEntryIntent
+        self.initialTournamentMatchContext = initialTournamentMatchContext
+    }
 
     private var isInputLocked: Bool { session.isInputLocked }
 
@@ -263,7 +295,7 @@ struct DartsGameView: View {
                     isLegInProgress: game.isLegInProgress,
                     canUndo: game.canUndo,
                     canUndoLocally: session.canUndoLocally,
-                    onNewGame: presentNewGameSetup,
+                    onNewGame: { presentNewGameSetup() },
                     onRestartLeg: {
                         if game.isLegInProgress {
                             isShowingRestartAlert = true
@@ -428,6 +460,16 @@ struct DartsGameView: View {
 
     private var observedContent: some View {
         presentedContent
+        .navigationBarBackButtonHidden()
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                ToolbarBackButton(
+                    action: { dismiss() },
+                    systemImage: "house.fill",
+                    accessibilityLabel: "Home"
+                )
+            }
+        }
         .onChange(of: isShowingNewGameSetup) { _, isShowing in
             guard session.role == .host, session.isActive else { return }
             session.setHostPreparingNewGame(isShowing)
@@ -459,7 +501,21 @@ struct DartsGameView: View {
         .onAppear {
             guard !hasPresentedInitialSetup else { return }
             hasPresentedInitialSetup = true
-            presentNewGameSetup()
+            if let initialTournamentMatchContext {
+                startTournamentMatch(initialTournamentMatchContext)
+                return
+            }
+
+            switch initialEntryIntent {
+            case .automaticSetup:
+                presentNewGameSetup()
+            case .resume:
+                break
+            case .newMatch:
+                presentNewGameSetup(preferredMode: .x01)
+            case .practice:
+                presentNewGameSetup(preferredMode: .practice)
+            }
         }
         .alert("Restart Leg?", isPresented: $isShowingRestartAlert) {
             Button("Cancel", role: .cancel) {}
@@ -685,7 +741,7 @@ struct DartsGameView: View {
         }
     }
 
-    private func presentNewGameSetup() {
+    private func presentNewGameSetup(preferredMode: GameMode? = nil) {
         persistCompletedGameIfNeeded()
         clearActiveTournamentMatchIfNeeded(resetUnfinished: true)
         let persistedNames = persistedNewGamePlayerNames()
@@ -727,6 +783,9 @@ struct DartsGameView: View {
             ?? (StartScoreOption(rawValue: game.startingScore) ?? .score501)
         setupSetModeEnabled = storedNewGameSetModeEnabled
         setupLegsToWin = max(1, storedNewGameLegsToWin)
+        if let preferredMode {
+            setupGameMode = preferredMode
+        }
         isShowingNewGameSetup = true
     }
 

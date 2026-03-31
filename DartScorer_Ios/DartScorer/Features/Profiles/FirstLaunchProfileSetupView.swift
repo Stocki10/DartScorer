@@ -5,7 +5,7 @@ struct FirstLaunchProfileSetupView: View {
     let onSkip: () -> Void
 
     @State private var name = ""
-    @State private var color: Color = .accentColor
+    @State private var color: Color = AppAccentColor.currentColor
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)

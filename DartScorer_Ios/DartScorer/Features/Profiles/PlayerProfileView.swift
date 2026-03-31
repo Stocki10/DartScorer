@@ -59,7 +59,7 @@ private struct ProfileRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color(hex: profile.colorHex) ?? Color.accentColor)
+                .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -163,7 +163,7 @@ struct ProfileDetailView: View {
                 Section("Profile") {
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color(hex: profile.colorHex) ?? Color.accentColor)
+                            .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                             .frame(width: 28, height: 28)
 
                         Text(profile.name)
@@ -260,7 +260,7 @@ struct ProfileDetailView: View {
                 }
 
                 if headToHeadSnapshot.hasCompetitiveHistory {
-                    Section(L10n.string("Head-to-Head")) {
+                    Section(L10n.string("vs")) {
                         if headToHeadSnapshot.hasOpponents {
                             ForEach(headToHeadSnapshot.opponents) { opponentSummary in
                                 NavigationLink {
@@ -407,7 +407,7 @@ struct ProfileFormView: View {
         self.store = store
         self.profile = profile
         _name = State(initialValue: profile?.name ?? "")
-        _color = State(initialValue: profile.flatMap { Color(hex: $0.colorHex) } ?? .accentColor)
+        _color = State(initialValue: profile.flatMap { Color(hex: $0.colorHex) } ?? AppAccentColor.currentColor)
     }
 
     private var isEditing: Bool { profile != nil }
@@ -482,7 +482,7 @@ private struct HeadToHeadRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color(hex: summary.opponentColorHex) ?? Color.accentColor)
+                .fill(Color(hex: summary.opponentColorHex) ?? AppAccentColor.currentColor)
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -535,12 +535,12 @@ private struct HeadToHeadDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 10) {
                         Circle()
-                            .fill(Color(hex: profile.colorHex) ?? Color.accentColor)
+                            .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                             .frame(width: 14, height: 14)
                         Text(L10n.format("%@ vs %@", profile.name, snapshot.opponent.opponentName))
                             .font(.headline)
                         Circle()
-                            .fill(Color(hex: snapshot.opponent.opponentColorHex) ?? Color.accentColor)
+                            .fill(Color(hex: snapshot.opponent.opponentColorHex) ?? AppAccentColor.currentColor)
                             .frame(width: 14, height: 14)
                     }
 
@@ -684,7 +684,7 @@ struct ProfilePickerView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Circle()
-                                .fill(Color(hex: profile.colorHex) ?? Color.accentColor)
+                                .fill(Color(hex: profile.colorHex) ?? AppAccentColor.currentColor)
                                 .frame(width: 24, height: 24)
                             Text(profile.name)
                                 .foregroundStyle(isExcluded ? Color.secondary : Color.primary)

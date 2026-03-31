@@ -84,7 +84,7 @@ struct SettingsPopupView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
-                    .tint(.accentColor)
+                    .tint(AppAccentColor.currentColor)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)

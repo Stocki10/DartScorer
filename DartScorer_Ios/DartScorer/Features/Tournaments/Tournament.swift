@@ -252,7 +252,7 @@ struct Tournament: Identifiable, Codable, Equatable {
     }
 }
 
-struct TournamentMatchLaunchContext: Identifiable, Equatable {
+struct TournamentMatchLaunchContext: Identifiable, Equatable, Codable {
     let tournamentID: UUID
     let tournamentName: String
     let tournamentFormat: TournamentFormat
