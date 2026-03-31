@@ -221,7 +221,7 @@ struct HistoryFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.string("Cancel")) { dismiss() }
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.string("Apply")) {

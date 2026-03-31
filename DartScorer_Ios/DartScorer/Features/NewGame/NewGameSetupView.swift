@@ -106,7 +106,7 @@ struct NewGameSetupView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .destructive, action: onCancel)
+                    ToolbarBackButton(action: onCancel, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: onStart)

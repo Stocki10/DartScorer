@@ -427,7 +427,7 @@ struct ProfileFormView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
@@ -703,7 +703,7 @@ struct ProfilePickerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
             }
         }
