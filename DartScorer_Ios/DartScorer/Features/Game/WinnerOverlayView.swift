@@ -60,13 +60,13 @@ struct WinnerOverlayView: View {
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 10) {
                 if showNewLeg, let onNewLegRandom {
-                    Button("Rematch", action: onNewLegRandom)
+                    Button(L10n.string("Rematch"), action: onNewLegRandom)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                 }
 
                 if let onNewGame {
-                    Button(showNewLeg ? "New Game" : "Start New Game", action: onNewGame)
+                    Button(showNewLeg ? L10n.string("New Game") : L10n.string("Start New Game"), action: onNewGame)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }

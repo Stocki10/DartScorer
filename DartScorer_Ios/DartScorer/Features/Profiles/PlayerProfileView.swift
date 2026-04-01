@@ -288,18 +288,18 @@ struct ProfileDetailView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "No Profile",
+                    L10n.string("No Profile"),
                     systemImage: "person.crop.circle.badge.exclamationmark",
-                    description: Text("This profile is no longer available.")
+                    description: Text(L10n.string("This profile is no longer available."))
                 )
             }
         }
-        .navigationTitle("Profile")
+        .navigationTitle(L10n.string("Profile"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if let profile {
-                    Button("Edit") {
+                    Button(L10n.string("Edit")) {
                         editingProfile = profile
                     }
                 }
@@ -415,22 +415,22 @@ struct ProfileFormView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Profile") {
-                    TextField("Name", text: $name)
+                Section(L10n.string("Profile")) {
+                    TextField(L10n.string("Name"), text: $name)
                         .textInputAutocapitalization(.words)
                         .disableAutocorrection(true)
 
-                    ColorPicker("Color", selection: $color, supportsOpacity: false)
+                    ColorPicker(L10n.string("Color"), selection: $color, supportsOpacity: false)
                 }
             }
-            .navigationTitle(isEditing ? "Edit Profile" : "New Profile")
+            .navigationTitle(isEditing ? L10n.string("Edit Profile") : L10n.string("New Profile"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button(L10n.string("Save")) { save() }
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }

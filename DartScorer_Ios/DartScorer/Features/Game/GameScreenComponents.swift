@@ -179,7 +179,7 @@ struct GameControlBar: View {
             }
             .buttonStyle(.bordered)
             .tint(sessionRole != .none ? .green : AppAccentColor.currentColor)
-            .accessibilityLabel(Text("Match"))
+            .accessibilityLabel(Text(L10n.string("Match")))
 
             Button(action: onUndo) {
                 Image(systemName: "arrow.uturn.backward")
@@ -188,11 +188,11 @@ struct GameControlBar: View {
             .disabled(!canUndo || (sessionRole != .none && !canUndoLocally))
 
             Menu {
-                Button("Profiles", action: onShowProfiles)
-                Button("History", action: onShowHistory)
-                Button("Tournaments", action: onShowTournaments)
+                Button(L10n.string("Profiles"), action: onShowProfiles)
+                Button(L10n.string("History"), action: onShowHistory)
+                Button(L10n.string("Tournaments"), action: onShowTournaments)
                     .disabled(sessionRole != .none)
-                Button("Settings", action: onShowSettings)
+                Button(L10n.string("Settings"), action: onShowSettings)
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
@@ -215,7 +215,7 @@ struct MatchManagementSheet: View {
         case .x01:
             return "\(game.startingScore)"
         case .cricket:
-            return "Cricket"
+            return GameMode.cricket.label
         case .practice:
             return game.practiceMode.label
         }
@@ -226,16 +226,16 @@ struct MatchManagementSheet: View {
         case .x01:
             return [game.inRule.label, game.finishRule.label].joined(separator: " • ")
         case .cricket:
-            return "Close 20 through 15 and Bull"
+            return L10n.string("Close 20 through 15 and Bull")
         case .practice:
             return game.practiceCompetitiveEnabled
-                ? "Competitive practice"
-                : "Solo practice"
+                ? L10n.string("Competitive practice")
+                : L10n.string("Solo practice")
         }
     }
 
     private var multiplayerStatusText: String {
-        connectedPlayerCount == 1 ? "Connecting…" : "\(connectedPlayerCount) Players Connected"
+        connectedPlayerCount == 1 ? L10n.string("Connecting…") : L10n.format("%d Players Connected", connectedPlayerCount)
     }
 
     var body: some View {
@@ -254,18 +254,18 @@ struct MatchManagementSheet: View {
                 }
 
                 if session.role != .none {
-                    Section("Multiplayer") {
-                        settingsRow("Session", value: multiplayerStatusText)
-                        settingsRow("Role", value: session.role == .host ? "Host" : "Joiner")
+                    Section(L10n.string("Multiplayer")) {
+                        settingsRow(L10n.string("Session"), value: multiplayerStatusText)
+                        settingsRow(L10n.string("Role"), value: session.role == .host ? L10n.string("Host") : L10n.string("Joiner"))
 
-                        Button(session.role == .host ? "Stop Multiplayer" : "Leave Session", role: .destructive) {
+                        Button(session.role == .host ? L10n.string("Stop Multiplayer") : L10n.string("Leave Session"), role: .destructive) {
                             dismiss()
                             onRequestDisconnect()
                         }
                     }
                 }
 
-                Section("Players") {
+                Section(L10n.string("Players")) {
                     ForEach(Array(game.players.enumerated()), id: \.element.id) { index, player in
                         HStack(spacing: 10) {
                             Circle()
@@ -276,7 +276,7 @@ struct MatchManagementSheet: View {
                                 Text(player.name)
                                     .font(.body.weight(index == game.activePlayerIndex ? .semibold : .regular))
                                 if index == game.activePlayerIndex {
-                                    Text("Current Player")
+                                    Text(L10n.string("Current Player"))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -298,25 +298,25 @@ struct MatchManagementSheet: View {
                     }
                 }
 
-                Section("Match Settings") {
-                    settingsRow("Mode", value: game.gameMode.label)
+                Section(L10n.string("Match Settings")) {
+                    settingsRow(L10n.string("Mode"), value: game.gameMode.label)
 
                     if game.gameMode == .x01 {
-                        settingsRow("Start Score", value: "\(game.startingScore)")
-                        settingsRow("In Mode", value: game.inRule.label)
-                        settingsRow("Finish Mode", value: game.finishRule.label)
+                        settingsRow(L10n.string("Start Score"), value: "\(game.startingScore)")
+                        settingsRow(L10n.string("In Mode"), value: game.inRule.label)
+                        settingsRow(L10n.string("Finish Mode"), value: game.finishRule.label)
                         if game.setModeEnabled {
-                            settingsRow("Legs to Win", value: "\(game.legsToWin)")
+                            settingsRow(L10n.string("Legs to Win"), value: "\(game.legsToWin)")
                         }
                     } else if game.gameMode == .practice {
-                        settingsRow("Practice Mode", value: game.practiceMode.label)
+                        settingsRow(L10n.string("Practice Mode"), value: game.practiceMode.label)
                         if game.practiceCompetitiveEnabled {
-                            settingsRow("First to Wins", value: "\(game.practiceSuccessesToWin)")
+                            settingsRow(L10n.string("First to Wins"), value: "\(game.practiceSuccessesToWin)")
                         }
                     }
                 }
             }
-            .navigationTitle("Match")
+            .navigationTitle(L10n.string("Match"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -388,7 +388,7 @@ struct ScoreboardSection: View {
                                 .fontWeight(.semibold)
                                 .monospacedDigit()
 
-                            Text("⌀ \(L10n.decimal(legAverage(player) ?? 0.0))")
+                            Text(L10n.format("⌀ %@", L10n.decimal(legAverage(player) ?? 0.0)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -540,7 +540,7 @@ struct QuickScorePadView: View {
                 Button {
                     onNoScoreTap()
                 } label: {
-                    Text("No\nScore")
+                    Text(L10n.string("No\nScore"))
                         .font(.footnote)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -552,7 +552,7 @@ struct QuickScorePadView: View {
             }
 
             if isVisitOpenInThrowsMode {
-                Text("Finish the current visit in Throws mode.")
+                Text(L10n.string("Finish the current visit in Throws mode."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -597,7 +597,7 @@ struct NumberPadView: View {
                 Color.clear.frame(height: 1)
                 Color.clear.frame(height: 1)
 
-                Button("No Score") {
+                Button(L10n.string("No Score")) {
                     onNoScoreTap()
                 }
                 .buttonStyle(.bordered)

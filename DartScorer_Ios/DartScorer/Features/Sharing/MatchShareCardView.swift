@@ -146,7 +146,7 @@ struct MatchShareCardView: View {
                     .multilineTextAlignment(alignment == .center ? .center : .leading)
             }
 
-            Text("WINS")
+            Text(L10n.string("WINS"))
                 .font(.system(size: winsSize, weight: .semibold, design: .rounded))
                 .tracking(4)
                 .foregroundStyle(.white.opacity(0.62))

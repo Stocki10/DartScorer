@@ -473,7 +473,9 @@ final class TournamentStore: ObservableObject {
     }
 
     func roundTitle(for match: TournamentMatch, in tournament: Tournament) -> String {
-        tournament.rounds.first(where: { $0.index == match.roundIndex })?.title ?? "Round \(match.roundIndex + 1)"
+        let storedTitle = tournament.rounds.first(where: { $0.index == match.roundIndex })?.title
+            ?? Self.roundTitle(roundIndex: match.roundIndex, totalRounds: max(tournament.rounds.count, match.roundIndex + 1))
+        return Self.localizedRoundTitle(storedTitle)
     }
 
     private func updateTournament(id: UUID, mutation: (inout Tournament) -> Void) {
@@ -748,6 +750,27 @@ final class TournamentStore: ObservableObject {
         default:
             let playerCount = Int(pow(2.0, Double(remainingRounds)))
             return "Round of \(playerCount)"
+        }
+    }
+
+    private static func localizedRoundTitle(_ title: String) -> String {
+        switch title {
+        case "Final":
+            return L10n.string("Final")
+        case "Semifinals":
+            return L10n.string("Semifinals")
+        case "Quarterfinals":
+            return L10n.string("Quarterfinals")
+        default:
+            if let value = Int(title.replacingOccurrences(of: "Round of ", with: "")),
+               title.hasPrefix("Round of ") {
+                return L10n.format("Round of %d", value)
+            }
+            if let value = Int(title.replacingOccurrences(of: "Round ", with: "")),
+               title.hasPrefix("Round ") {
+                return L10n.format("Round %d", value)
+            }
+            return title
         }
     }
 

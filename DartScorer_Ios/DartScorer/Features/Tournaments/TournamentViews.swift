@@ -216,7 +216,7 @@ struct TournamentDetailView: View {
                     VStack(alignment: .leading, spacing: 20) {
                         TournamentHeaderCard(tournament: tournament)
 
-                        Picker("Section", selection: $selectedTab) {
+                        Picker(L10n.string("Section"), selection: $selectedTab) {
                             ForEach(availableTabs) { tab in
                                 Text(tab.label).tag(tab)
                             }
@@ -256,9 +256,9 @@ struct TournamentDetailView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "Tournament Unavailable",
+                    L10n.string("Tournament Unavailable"),
                     systemImage: "exclamationmark.triangle",
-                    description: Text("This tournament could not be loaded.")
+                    description: Text(L10n.string("This tournament could not be loaded."))
                 )
             }
         }
@@ -296,10 +296,10 @@ private struct TournamentHeaderCard: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                summaryLine(systemImage: "person.3.fill", text: "\(tournament.participants.count) Players")
+                summaryLine(systemImage: "person.3.fill", text: L10n.format("%d Players", tournament.participants.count))
                 summaryLine(
                     systemImage: "checkmark.circle.fill",
-                    text: "\(tournament.completedMatchCount) of \(tournament.playableMatchCount) Matches Completed"
+                    text: L10n.format("%d of %d Matches Completed", tournament.completedMatchCount, tournament.playableMatchCount)
                 )
             }
 
@@ -308,7 +308,7 @@ private struct TournamentHeaderCard: View {
                     Circle()
                         .fill(Color(hex: winner.colorHex) ?? AppAccentColor.currentColor)
                         .frame(width: 12, height: 12)
-                    Text("Winner: \(winner.name)")
+                    Text(L10n.format("Winner: %@", winner.name))
                         .font(.headline)
                 }
             }
@@ -688,13 +688,13 @@ private struct TournamentStandingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Player")
+                Text(L10n.string("Player"))
                 Spacer()
-                Text("W")
+                Text(L10n.string("W"))
                     .frame(width: 26)
-                Text("L")
+                Text(L10n.string("L"))
                     .frame(width: 26)
-                Text("+/-")
+                Text(L10n.string("+/-"))
                     .frame(width: 40)
             }
             .font(.caption.weight(.semibold))
@@ -762,9 +762,9 @@ private struct TournamentMatchesSection: View {
 
     private var roundRobinSections: [(title: String, matches: [TournamentMatch])] {
         [
-            ("In Progress", sortedMatches.filter { $0.status == .inProgress }),
-            ("Ready", sortedMatches.filter { $0.status == .ready }),
-            ("Completed", sortedMatches.filter { $0.status == .completed })
+            (L10n.string("In Progress"), sortedMatches.filter { $0.status == .inProgress }),
+            (L10n.string("Ready"), sortedMatches.filter { $0.status == .ready }),
+            (L10n.string("Completed"), sortedMatches.filter { $0.status == .completed })
         ]
         .filter { !$0.matches.isEmpty }
     }
@@ -908,22 +908,22 @@ private struct ListMatchCard: View {
     }
 
     private var byeMessage: String {
-        let name = winningParticipant?.name ?? "Player"
-        return "\(name) advances automatically"
+        let name = winningParticipant?.name ?? L10n.string("Player")
+        return L10n.format("%@ advances automatically", name)
     }
 
     private var statusLabel: String {
         switch match.status {
         case .pending:
-            return "Pending"
+            return L10n.string("Pending")
         case .ready:
-            return "Ready"
+            return L10n.string("Ready")
         case .inProgress:
-            return "In Progress"
+            return L10n.string("In Progress")
         case .completed:
-            return "Completed"
+            return L10n.string("Completed")
         case .bye:
-            return "Bye"
+            return L10n.string("Bye")
         }
     }
 
@@ -1143,14 +1143,14 @@ private struct TournamentMatchDetailView: View {
     }
 
     private var roundTitle: String {
-        guard let tournament, let match else { return "Match" }
+        guard let tournament, let match else { return L10n.string("Match") }
         if tournament.format == .singleElimination {
-            return tournament.rounds.first(where: { $0.index == match.roundIndex })?.title ?? "Match"
+            return store.roundTitle(for: match, in: tournament)
         }
         if tournament.roundRobinMode == .double {
-            return "Round \(match.roundIndex + 1) • Match \(roundRobinMatchNumber(match, tournament: tournament))"
+            return L10n.format("Round %d • Match %d", match.roundIndex + 1, roundRobinMatchNumber(match, tournament: tournament))
         }
-        return "Match \(match.slotIndex + 1)"
+        return L10n.format("Match %d", match.slotIndex + 1)
     }
 
     private var record: GameRecord? {
@@ -1163,8 +1163,8 @@ private struct TournamentMatchDetailView: View {
     }
 
     private var actionTitle: String {
-        guard let match else { return "Play Match" }
-        return match.status == .inProgress ? "Resume Match" : "Play Match"
+        guard let match else { return L10n.string("Play Match") }
+        return match.status == .inProgress ? L10n.string("Resume Match") : L10n.string("Play Match")
     }
 
     var body: some View {
@@ -1215,7 +1215,7 @@ private struct TournamentMatchDetailView: View {
 
                         if let record {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("Match Result")
+                                Text(L10n.string("Match Result"))
                                     .font(.headline)
 
                                 Button {
@@ -1233,7 +1233,7 @@ private struct TournamentMatchDetailView: View {
                             }
                             .buttonStyle(.borderedProminent)
                         } else if match.status == .pending {
-                            Text("This match will unlock once the previous result is known.")
+                            Text(L10n.string("This match will unlock once the previous result is known."))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -1247,9 +1247,9 @@ private struct TournamentMatchDetailView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "Match Unavailable",
+                    L10n.string("Match Unavailable"),
                     systemImage: "exclamationmark.triangle",
-                    description: Text("This match could not be loaded.")
+                    description: Text(L10n.string("This match could not be loaded."))
                 )
             }
         }
@@ -1257,7 +1257,7 @@ private struct TournamentMatchDetailView: View {
 
     private func matchDetailSubtitle(for tournament: Tournament, match: TournamentMatch) -> String {
         if tournament.format == .singleElimination {
-            let matchLabel = "Match \(match.slotIndex + 1)"
+            let matchLabel = L10n.format("Match %d", match.slotIndex + 1)
             return "\(tournament.name) • \(matchLabel)"
         }
         return tournament.rules.formatSummary
@@ -1274,7 +1274,7 @@ private struct TournamentMatchDetailView: View {
                 .fill(participant.flatMap { Color(hex: $0.colorHex) } ?? Color(.systemGray4))
                 .frame(width: 12, height: 12)
 
-            Text(participant?.name ?? "TBD")
+            Text(participant?.name ?? L10n.string("TBD"))
                 .font(.body.weight(isWinner ? .semibold : .regular))
                 .foregroundStyle(participant == nil ? .secondary : .primary)
 
@@ -1362,10 +1362,10 @@ struct TournamentSetupView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Tournament") {
-                    TextField("Name", text: $tournamentName)
+                Section(L10n.string("Tournament")) {
+                    TextField(L10n.string("Name"), text: $tournamentName)
 
-                    Picker("Format", selection: $format) {
+                    Picker(L10n.string("Format"), selection: $format) {
                         ForEach(TournamentFormat.allCases) { format in
                             Text(format.label).tag(format)
                         }
@@ -1373,7 +1373,7 @@ struct TournamentSetupView: View {
                     .pickerStyle(.menu)
 
                     if format == .roundRobin {
-                        Picker("Round Robin", selection: $roundRobinMode) {
+                        Picker(L10n.string("Round Robin"), selection: $roundRobinMode) {
                             ForEach(TournamentRoundRobinMode.allCases) { mode in
                                 Text(mode.label).tag(mode)
                             }
@@ -1381,16 +1381,16 @@ struct TournamentSetupView: View {
                         .pickerStyle(.menu)
                     }
 
-                    Toggle("Random Seeding", isOn: $randomSeedingEnabled)
+                    Toggle(L10n.string("Random Seeding"), isOn: $randomSeedingEnabled)
                         .onChange(of: randomSeedingEnabled) { _, isEnabled in
                             guard isEnabled else { return }
                             randomizeSelectedProfiles()
                         }
                 }
 
-                Section("Available Profiles") {
+                Section(L10n.string("Available Profiles")) {
                     if profileStore.profiles.isEmpty {
-                        Text("Create player profiles first to run a tournament.")
+                        Text(L10n.string("Create player profiles first to run a tournament."))
                             .foregroundStyle(.secondary)
                     }
 
@@ -1419,12 +1419,12 @@ struct TournamentSetupView: View {
                 }
 
                 if !randomSeedingEnabled {
-                    Section("Player Order") {
+                    Section(L10n.string("Player Order")) {
                         if selectedProfiles.isEmpty {
-                            Text("Select at least two profiles to start a tournament.")
+                            Text(L10n.string("Select at least two profiles to start a tournament."))
                                 .foregroundStyle(.secondary)
                         } else {
-                            Text("Drag to reorder seeded players")
+                            Text(L10n.string("Drag to reorder seeded players"))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
 
@@ -1454,18 +1454,18 @@ struct TournamentSetupView: View {
                     }
                 }
 
-                Section("Match Rules") {
+                Section(L10n.string("Match Rules")) {
                     CompetitiveTournamentRulesEditor(rules: $rules)
                 }
             }
-            .navigationTitle("Create Tournament")
+            .navigationTitle(L10n.string("Create Tournament"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     ToolbarBackButton(action: { dismiss() }, accessibilityLabel: "Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                    Button(L10n.string("Create")) {
                         let participants = selectedProfiles.enumerated().map { index, profile in
                             TournamentParticipant(
                                 profileID: profile.id,
@@ -1511,35 +1511,35 @@ private struct CompetitiveTournamentRulesEditor: View {
 
     var body: some View {
         Group {
-            Picker("Game Type", selection: $rules.gameMode) {
+            Picker(L10n.string("Game Type"), selection: $rules.gameMode) {
                 Text(GameMode.x01.label).tag(GameMode.x01)
                 Text(GameMode.cricket.label).tag(GameMode.cricket)
             }
             .pickerStyle(.menu)
 
             if rules.gameMode == .x01 {
-                Picker("Game", selection: $rules.startingScore) {
+                Picker(L10n.string("Game"), selection: $rules.startingScore) {
                     ForEach(StartScoreOption.allCases) { option in
                         Text(option.label).tag(option)
                     }
                 }
                 .pickerStyle(.menu)
 
-                Picker("In Mode", selection: $rules.inRule) {
+                Picker(L10n.string("In Mode"), selection: $rules.inRule) {
                     ForEach(InRule.allCases) { rule in
                         Text(rule.label).tag(rule)
                     }
                 }
                 .pickerStyle(.menu)
 
-                Picker("Finish Mode", selection: $rules.finishRule) {
+                Picker(L10n.string("Finish Mode"), selection: $rules.finishRule) {
                     ForEach(FinishRule.allCases) { rule in
                         Text(rule.label).tag(rule)
                     }
                 }
                 .pickerStyle(.menu)
 
-                Toggle("Set Mode", isOn: $rules.setModeEnabled)
+                Toggle(L10n.string("Set Mode"), isOn: $rules.setModeEnabled)
 
                 if rules.setModeEnabled {
                     Stepper(
